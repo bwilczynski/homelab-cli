@@ -29,3 +29,25 @@ func TestFormatBytes(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatUptime(t *testing.T) {
+	tests := []struct {
+		input    int
+		expected string
+	}{
+		{0, "0s"},
+		{45, "45s"},
+		{3600, "1h 0m 0s"},
+		{7200, "2h 0m 0s"},
+		{3665, "1h 1m 5s"},
+		{86400, "1d 0h 0m 0s"},
+		{604800, "7d 0h 0m 0s"},
+		{90061, "1d 1h 1m 1s"},
+	}
+	for _, tt := range tests {
+		got := output.FormatUptime(tt.input)
+		if got != tt.expected {
+			t.Errorf("FormatUptime(%d) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
