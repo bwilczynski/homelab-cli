@@ -231,3 +231,81 @@ func TestRestartCmd_success(t *testing.T) {
 		t.Errorf("expected container ID in output, got: %s", buf.String())
 	}
 }
+
+func TestStartCmd_apiError(t *testing.T) {
+	stub := &StubClient{
+		StartContainerFunc: func(_ context.Context, _ string, _ *gen.StartContainerParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusNotFound, map[string]any{
+				"type":   "https://homelab.local/problems/not-found",
+				"title":  "Not Found",
+				"status": 404,
+				"detail": "container 'nas-1.foo' does not exist",
+			}), nil
+		},
+	}
+
+	cmd := newStartCmd(stub)
+	cmd.SetArgs([]string{"nas-1.foo"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}
+
+func TestStopCmd_apiError(t *testing.T) {
+	stub := &StubClient{
+		StopContainerFunc: func(_ context.Context, _ string, _ *gen.StopContainerParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusNotFound, map[string]any{
+				"type":   "https://homelab.local/problems/not-found",
+				"title":  "Not Found",
+				"status": 404,
+				"detail": "container 'nas-1.foo' does not exist",
+			}), nil
+		},
+	}
+
+	cmd := newStopCmd(stub)
+	cmd.SetArgs([]string{"nas-1.foo"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}
+
+func TestRestartCmd_apiError(t *testing.T) {
+	stub := &StubClient{
+		RestartContainerFunc: func(_ context.Context, _ string, _ *gen.RestartContainerParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusNotFound, map[string]any{
+				"type":   "https://homelab.local/problems/not-found",
+				"title":  "Not Found",
+				"status": 404,
+				"detail": "container 'nas-1.foo' does not exist",
+			}), nil
+		},
+	}
+
+	cmd := newRestartCmd(stub)
+	cmd.SetArgs([]string{"nas-1.foo"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}
