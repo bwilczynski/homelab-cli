@@ -1,0 +1,11 @@
+bin/
+*.env
+
+# Generated client code (regenerated via make generate)
+internal/*/api.gen.go
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Git worktrees
+.worktrees/
