@@ -11,8 +11,8 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	gen "github.com/bwilczynski/hlctl/internal/system"
 	"github.com/bwilczynski/hlctl/internal/output"
+	gen "github.com/bwilczynski/hlctl/internal/system"
 	"github.com/spf13/cobra"
 )
 

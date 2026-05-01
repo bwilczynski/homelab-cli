@@ -9,8 +9,8 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	gen "github.com/bwilczynski/hlctl/internal/storage"
 	"github.com/bwilczynski/hlctl/internal/output"
+	gen "github.com/bwilczynski/hlctl/internal/storage"
 	"github.com/spf13/cobra"
 )
 
