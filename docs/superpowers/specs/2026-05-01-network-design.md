@@ -137,9 +137,10 @@ Commands under test constructed as `newDevicesCmd(stub)` / `newClientCmd(stub)`,
 
 ## Discriminated Union Handling
 
-`NetworkClientDetail` is an `anyOf` discriminated by `connectionType`. Because oapi-codegen may represent `anyOf` as a merged struct with all fields optional (pointer types), the renderer unmarshals into a single struct and checks `connectionType` to decide which rows to render:
+`NetworkClientDetail` in the generated code is a union type backed by `json.RawMessage` with typed accessor methods:
 
-- `"wireless"` → render `ssid`, `signalStrength` (as `"-62 dBm"`); skip switch fields
-- `"wired"` → render `switchName`, `switchPort`; skip wireless fields
+- `detail.Discriminator()` — returns the `connectionType` string (`"wired"` or `"wireless"`)
+- `detail.AsWiredNetworkClientDetail()` — unmarshals into `WiredNetworkClientDetail` (fields: `Id`, `Name`, `Mac`, `Ip`, `ConnectionType`, `SwitchName`, `SwitchPort`, `Uptime`)
+- `detail.AsWirelessNetworkClientDetail()` — unmarshals into `WirelessNetworkClientDetail` (fields: `Id`, `Name`, `Mac`, `Ip`, `ConnectionType`, `Ssid`, `SignalStrength`, `Uptime`)
 
-After running `make generate`, inspect the actual generated type and adapt field access accordingly. The `connectionType` field drives which rows are added — no empty placeholder rows.
+The renderer calls `Discriminator()` to branch, then calls the appropriate `As*` method to get the typed struct and build rows. No merged-struct approach needed — no empty placeholder rows.
