@@ -32,7 +32,7 @@ func newVolumesCmd() *cobra.Command {
 			for _, d := range data {
 				rows = append(rows, []string{d["id"], d["size"], d["used"], d["raid"], d["health"]})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 
@@ -61,7 +61,7 @@ func newVolumeCmd() *cobra.Command {
 				{"RAID", "SHR-2"},
 				{"Health", "healthy"},
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }

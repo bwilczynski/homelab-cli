@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"text/tabwriter"
 )
 
@@ -18,12 +17,12 @@ const (
 // Print renders data in the specified format.
 // For table format, headers and rows are used.
 // For JSON format, data is marshalled directly.
-func Print(format Format, data any, headers []string, rows [][]string) error {
+func Print(w io.Writer, format Format, data any, headers []string, rows [][]string) error {
 	switch format {
 	case FormatJSON:
-		return printJSON(os.Stdout, data)
+		return printJSON(w, data)
 	default:
-		return printTable(os.Stdout, headers, rows)
+		return printTable(w, headers, rows)
 	}
 }
 
@@ -53,4 +52,19 @@ func printTable(w io.Writer, headers []string, rows [][]string) error {
 		fmt.Fprintln(tw)
 	}
 	return tw.Flush()
+}
+
+// FormatBytes converts a byte count to a human-readable string using binary units.
+func FormatBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for n := n / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	units := []string{"KB", "MB", "GB", "TB", "PB"}
+	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
 }
