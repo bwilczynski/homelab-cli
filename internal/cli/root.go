@@ -1,15 +1,15 @@
 package cli
 
 import (
+	"github.com/bwilczynski/hlctl/internal/cli/backups"
 	"github.com/bwilczynski/hlctl/internal/cli/config"
+	"github.com/bwilczynski/hlctl/internal/cli/containers"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/login"
-	"github.com/bwilczynski/hlctl/internal/output"
+	"github.com/bwilczynski/hlctl/internal/cli/network"
+	"github.com/bwilczynski/hlctl/internal/cli/storage"
+	"github.com/bwilczynski/hlctl/internal/cli/system"
 	"github.com/spf13/cobra"
-)
-
-var (
-	outputFormat string
-	apiURL       string
 )
 
 var rootCmd = &cobra.Command{
@@ -19,18 +19,15 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "table", "Output format: table or json")
-	rootCmd.PersistentFlags().StringVar(&apiURL, "api-url", "", "Override API base URL")
+	rootCmd.PersistentFlags().StringVarP(&flags.OutputFormat, "output", "o", "table", "Output format: table or json")
+	rootCmd.PersistentFlags().StringVar(&flags.APIURL, "api-url", "", "Override API base URL")
+	rootCmd.AddCommand(backups.NewCmd())
 	rootCmd.AddCommand(config.NewCmd())
+	rootCmd.AddCommand(containers.NewCmd())
 	rootCmd.AddCommand(login.NewCmd())
-}
-
-func OutputFormat() output.Format {
-	return output.Format(outputFormat)
-}
-
-func APIURLOverride() string {
-	return apiURL
+	rootCmd.AddCommand(network.NewCmd())
+	rootCmd.AddCommand(storage.NewCmd())
+	rootCmd.AddCommand(system.NewCmd())
 }
 
 func Execute() error {
