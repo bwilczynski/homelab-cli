@@ -105,10 +105,161 @@ func newGetCmd(client ContainersClient) *cobra.Command {
 		Short: "Show container details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// implemented in Task 5
-			return fmt.Errorf("not implemented")
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			resp, err := c.GetContainer(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var detail gen.ContainerDetail
+			if err := json.Unmarshal(body, &detail); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			return printContainerDetail(cmd, detail)
 		},
 	}
+}
+
+func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
+	w := cmd.OutOrStdout()
+
+	memoryLimit := "unlimited"
+	if d.MemoryLimit > 0 {
+		memoryLimit = output.FormatBytes(d.MemoryLimit)
+	}
+
+	// Flat fields
+	headers := []string{"FIELD", "VALUE"}
+	rows := [][]string{
+		{"ID", d.Id},
+		{"NAME", d.Name},
+		{"DEVICE", d.Device},
+		{"STATUS", string(d.Status)},
+		{"IMAGE", d.Image},
+		{"RESTART COUNT", fmt.Sprintf("%d", d.RestartCount)},
+		{"CPU", fmt.Sprintf("%.1f%%", d.Resources.CpuPercent)},
+		{"MEMORY", fmt.Sprintf("%s (%.1f%%)", output.FormatBytes(d.Resources.MemoryBytes), d.Resources.MemoryPercent)},
+		{"STARTED AT", d.StartedAt.String()},
+		{"EXIT CODE", fmt.Sprintf("%d", d.ExitCode)},
+		{"OOM KILLED", fmt.Sprintf("%v", d.OomKilled)},
+		{"RESTART POLICY", string(d.RestartPolicy)},
+		{"PRIVILEGED", fmt.Sprintf("%v", d.Privileged)},
+		{"MEMORY LIMIT", memoryLimit},
+	}
+	if err := output.Print(w, output.FormatTable, nil, headers, rows); err != nil {
+		return err
+	}
+
+	// Port bindings
+	if len(d.PortBindings) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "PORT BINDINGS")
+		var pbRows [][]string
+		for _, pb := range d.PortBindings {
+			pbRows = append(pbRows, []string{
+				fmt.Sprintf("%d", pb.ContainerPort),
+				fmt.Sprintf("%d", pb.HostPort),
+				string(pb.Protocol),
+			})
+		}
+		if err := output.Print(w, output.FormatTable, nil, []string{"CONTAINER PORT", "HOST PORT", "PROTOCOL"}, pbRows); err != nil {
+			return err
+		}
+	}
+
+	// Networks
+	if len(d.Networks) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "NETWORKS")
+		var netRows [][]string
+		for _, n := range d.Networks {
+			netRows = append(netRows, []string{n.Name, n.Driver})
+		}
+		if err := output.Print(w, output.FormatTable, nil, []string{"NAME", "DRIVER"}, netRows); err != nil {
+			return err
+		}
+	}
+
+	// Volume bindings
+	if len(d.VolumeBindings) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "VOLUME BINDINGS")
+		var volRows [][]string
+		for _, v := range d.VolumeBindings {
+			volRows = append(volRows, []string{v.Source, v.Destination, string(v.Mode)})
+		}
+		if err := output.Print(w, output.FormatTable, nil, []string{"SOURCE", "DESTINATION", "MODE"}, volRows); err != nil {
+			return err
+		}
+	}
+
+	// Environment variables
+	if len(d.EnvVariables) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "ENVIRONMENT VARIABLES")
+		var envRows [][]string
+		for _, e := range d.EnvVariables {
+			envRows = append(envRows, []string{e.Key, e.Value})
+		}
+		if err := output.Print(w, output.FormatTable, nil, []string{"KEY", "VALUE"}, envRows); err != nil {
+			return err
+		}
+	}
+
+	// Entrypoint
+	if len(d.Entrypoint) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "ENTRYPOINT")
+		for _, e := range d.Entrypoint {
+			fmt.Fprintln(w, " ", e)
+		}
+	}
+
+	// Command
+	if len(d.Cmd) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "COMMAND")
+		for _, c := range d.Cmd {
+			fmt.Fprintln(w, " ", c)
+		}
+	}
+
+	// Labels
+	if d.Labels != nil && len(*d.Labels) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "LABELS")
+		var labelRows [][]string
+		for k, v := range *d.Labels {
+			labelRows = append(labelRows, []string{k, v})
+		}
+		if err := output.Print(w, output.FormatTable, nil, []string{"KEY", "VALUE"}, labelRows); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func newStartCmd(client ContainersClient) *cobra.Command {
