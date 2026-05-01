@@ -2,6 +2,7 @@ package cli
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/config"
+	"github.com/bwilczynski/hlctl/internal/cli/login"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -21,6 +22,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "table", "Output format: table or json")
 	rootCmd.PersistentFlags().StringVar(&apiURL, "api-url", "", "Override API base URL")
 	rootCmd.AddCommand(config.NewCmd())
+	rootCmd.AddCommand(login.NewCmd())
 }
 
 func OutputFormat() output.Format {
