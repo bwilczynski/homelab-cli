@@ -54,3 +54,18 @@ func printTable(w io.Writer, headers []string, rows [][]string) error {
 	}
 	return tw.Flush()
 }
+
+// FormatBytes converts a byte count to a human-readable string using binary units.
+func FormatBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for n := n / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	units := []string{"KB", "MB", "GB", "TB", "PB"}
+	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
+}
