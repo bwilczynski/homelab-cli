@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -67,4 +68,29 @@ func FormatBytes(n int64) string {
 	}
 	units := []string{"KB", "MB", "GB", "TB", "PB"}
 	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
+}
+
+// FormatUptime converts seconds to a human-readable duration string.
+// Leading zero segments are skipped; seconds are always included.
+// Examples: 86400 → "1d 0h 0m 0s", 7200 → "2h 0m 0s", 45 → "45s".
+func FormatUptime(seconds int) string {
+	d := seconds / 86400
+	seconds %= 86400
+	h := seconds / 3600
+	seconds %= 3600
+	m := seconds / 60
+	s := seconds % 60
+
+	type seg struct {
+		val  int
+		unit string
+	}
+	segs := []seg{{d, "d"}, {h, "h"}, {m, "m"}, {s, "s"}}
+	var parts []string
+	for _, sg := range segs {
+		if len(parts) > 0 || sg.val > 0 || sg.unit == "s" {
+			parts = append(parts, fmt.Sprintf("%d%s", sg.val, sg.unit))
+		}
+	}
+	return strings.Join(parts, " ")
 }
