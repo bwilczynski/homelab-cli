@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,5 +29,5 @@ func ParseError(resp *http.Response) error {
 	if p.Detail != nil && *p.Detail != "" {
 		return fmt.Errorf("%s — %s", p.Title, *p.Detail)
 	}
-	return fmt.Errorf("%s", p.Title)
+	return errors.New(p.Title)
 }

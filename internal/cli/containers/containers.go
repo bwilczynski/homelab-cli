@@ -78,6 +78,7 @@ func newListCmd(client ContainersClient) *cobra.Command {
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
+				// Pass through raw server JSON without re-encoding to preserve exact formatting.
 				fmt.Fprint(cmd.OutOrStdout(), string(body))
 				return nil
 			}
@@ -135,6 +136,7 @@ func newGetCmd(client ContainersClient) *cobra.Command {
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
+				// Pass through raw server JSON without re-encoding to preserve exact formatting.
 				fmt.Fprint(cmd.OutOrStdout(), string(body))
 				return nil
 			}
