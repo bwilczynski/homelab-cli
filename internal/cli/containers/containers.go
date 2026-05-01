@@ -1,9 +1,15 @@
 package containers
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 
+	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	gen "github.com/bwilczynski/hlctl/internal/containers"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -14,32 +20,78 @@ func NewCmd() *cobra.Command {
 		Short: "Manage Docker containers",
 	}
 
-	cmd.AddCommand(newListCmd())
-	cmd.AddCommand(newGetCmd())
-	cmd.AddCommand(newStartCmd())
-	cmd.AddCommand(newStopCmd())
-	cmd.AddCommand(newRestartCmd())
+	cmd.AddCommand(newListCmd(nil))
+	cmd.AddCommand(newGetCmd(nil))
+	cmd.AddCommand(newStartCmd(nil))
+	cmd.AddCommand(newStopCmd(nil))
+	cmd.AddCommand(newRestartCmd(nil))
 	return cmd
 }
 
-func newListCmd() *cobra.Command {
+func buildClient() (ContainersClient, error) {
+	httpClient, apiURL, err := apiclient.NewHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return NewContainersClient(httpClient, apiURL)
+}
+
+func newListCmd(client ContainersClient) *cobra.Command {
 	var device string
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List containers",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			data := []map[string]string{
-				{"id": "nas-1.homeassistant", "image": "homeassistant/home-assistant:2024.1", "status": "running", "cpu": "2.3%", "memory": "512MB"},
-				{"id": "nas-1.plex", "image": "plexinc/pms-docker:latest", "status": "running", "cpu": "5.1%", "memory": "1.2GB"},
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			params := &gen.ListContainersParams{}
+			if device != "" {
+				params.Device = &device
+			}
+
+			resp, err := c.ListContainers(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.ContainerList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
 			}
 
 			headers := []string{"ID", "IMAGE", "STATUS", "CPU", "MEMORY"}
 			var rows [][]string
-			for _, d := range data {
-				rows = append(rows, []string{d["id"], d["image"], d["status"], d["cpu"], d["memory"]})
+			for _, c := range list.Items {
+				rows = append(rows, []string{
+					c.Id,
+					c.Image,
+					string(c.Status),
+					fmt.Sprintf("%.1f%%", c.Resources.CpuPercent),
+					output.FormatBytes(c.Resources.MemoryBytes),
+				})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
 		},
 	}
 
@@ -47,63 +99,50 @@ func newListCmd() *cobra.Command {
 	return cmd
 }
 
-func newGetCmd() *cobra.Command {
+func newGetCmd(client ContainersClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <container-id>",
 		Short: "Show container details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			data := map[string]any{
-				"id":     args[0],
-				"image":  "homeassistant/home-assistant:2024.1",
-				"status": "running",
-				"ports":  []string{"8123:8123/tcp"},
-			}
-
-			headers := []string{"FIELD", "VALUE"}
-			rows := [][]string{
-				{"ID", args[0]},
-				{"Image", "homeassistant/home-assistant:2024.1"},
-				{"Status", "running"},
-				{"Ports", "8123:8123/tcp"},
-			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			// implemented in Task 5
+			return fmt.Errorf("not implemented")
 		},
 	}
 }
 
-func newStartCmd() *cobra.Command {
+func newStartCmd(client ContainersClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "start <container-id>",
 		Short: "Start a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(cmd.OutOrStdout(), "Container %s started\n", args[0])
-			return nil
+			// implemented in Task 6
+			return fmt.Errorf("not implemented")
 		},
 	}
 }
 
-func newStopCmd() *cobra.Command {
+func newStopCmd(client ContainersClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop <container-id>",
 		Short: "Stop a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(cmd.OutOrStdout(), "Container %s stopped\n", args[0])
-			return nil
+			// implemented in Task 6
+			return fmt.Errorf("not implemented")
 		},
 	}
 }
 
-func newRestartCmd() *cobra.Command {
+func newRestartCmd(client ContainersClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "restart <container-id>",
 		Short: "Restart a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(cmd.OutOrStdout(), "Container %s restarted\n", args[0])
-			return nil
+			// implemented in Task 6
+			return fmt.Errorf("not implemented")
 		},
 	}
 }

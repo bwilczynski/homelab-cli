@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"text/tabwriter"
 )
 
@@ -18,12 +17,12 @@ const (
 // Print renders data in the specified format.
 // For table format, headers and rows are used.
 // For JSON format, data is marshalled directly.
-func Print(format Format, data any, headers []string, rows [][]string) error {
+func Print(w io.Writer, format Format, data any, headers []string, rows [][]string) error {
 	switch format {
 	case FormatJSON:
-		return printJSON(os.Stdout, data)
+		return printJSON(w, data)
 	default:
-		return printTable(os.Stdout, headers, rows)
+		return printTable(w, headers, rows)
 	}
 }
 

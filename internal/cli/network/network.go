@@ -33,7 +33,7 @@ func newDevicesCmd() *cobra.Command {
 			for _, d := range data {
 				rows = append(rows, []string{d["id"], d["model"], d["status"], d["clients"]})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }
@@ -59,7 +59,7 @@ func newDeviceCmd() *cobra.Command {
 				{"Status", "connected"},
 				{"Uptime", "30d 5h"},
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }
@@ -78,7 +78,7 @@ func newClientsCmd() *cobra.Command {
 			for _, d := range data {
 				rows = append(rows, []string{d["id"], d["hostname"], d["ip"], d["connection"]})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }
@@ -106,7 +106,7 @@ func newClientCmd() *cobra.Command {
 				{"SSID", "HomeNet"},
 				{"Signal", "-42 dBm"},
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }

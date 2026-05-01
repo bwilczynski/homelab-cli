@@ -40,7 +40,7 @@ func newHealthCmd() *cobra.Command {
 				{"nas-1", "healthy"},
 				{"unifi", "healthy"},
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }
@@ -60,7 +60,7 @@ func newInfoCmd() *cobra.Command {
 			for _, d := range data {
 				rows = append(rows, []string{d["device"], d["model"], d["firmware"], d["uptime"]})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 
@@ -83,7 +83,7 @@ func newUtilizationCmd() *cobra.Command {
 			for _, d := range data {
 				rows = append(rows, []string{d["device"], d["cpu"], d["memory"], d["swap"]})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 
@@ -106,7 +106,7 @@ func newUpdatesCmd() *cobra.Command {
 			for _, d := range data {
 				rows = append(rows, []string{d["id"], d["type"], d["current"], d["latest"], d["status"]})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 
@@ -136,7 +136,7 @@ func newUpdateCmd() *cobra.Command {
 				{"Latest", "2024.2.0"},
 				{"Status", "available"},
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }

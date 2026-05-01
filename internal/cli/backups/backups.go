@@ -32,7 +32,7 @@ func newTasksCmd() *cobra.Command {
 			for _, d := range data {
 				rows = append(rows, []string{d["id"], d["status"], d["lastResult"], d["type"]})
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 
@@ -63,7 +63,7 @@ func newTaskCmd() *cobra.Command {
 				{"Last Run", "2026-04-30T03:00:00Z"},
 				{"Next Run", "2026-05-01T03:00:00Z"},
 			}
-			return output.Print(flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
 		},
 	}
 }
