@@ -1,0 +1,8 @@
+package: storage
+generate:
+  client: true
+  models: true
+output: internal/storage/api.gen.go
+output-options:
+  include-tags:
+    - storage

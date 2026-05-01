@@ -1,0 +1,8 @@
+package: system
+generate:
+  client: true
+  models: true
+output: internal/system/api.gen.go
+output-options:
+  include-tags:
+    - system

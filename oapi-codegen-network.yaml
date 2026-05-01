@@ -1,0 +1,8 @@
+package: network
+generate:
+  client: true
+  models: true
+output: internal/network/api.gen.go
+output-options:
+  include-tags:
+    - network

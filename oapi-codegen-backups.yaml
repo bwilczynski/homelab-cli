@@ -1,0 +1,8 @@
+package: backups
+generate:
+  client: true
+  models: true
+output: internal/backups/api.gen.go
+output-options:
+  include-tags:
+    - backups
