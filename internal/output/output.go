@@ -1,0 +1,56 @@
+package output
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"text/tabwriter"
+)
+
+type Format string
+
+const (
+	FormatTable Format = "table"
+	FormatJSON  Format = "json"
+)
+
+// Print renders data in the specified format.
+// For table format, headers and rows are used.
+// For JSON format, data is marshalled directly.
+func Print(format Format, data any, headers []string, rows [][]string) error {
+	switch format {
+	case FormatJSON:
+		return printJSON(os.Stdout, data)
+	default:
+		return printTable(os.Stdout, headers, rows)
+	}
+}
+
+func printJSON(w io.Writer, data any) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(data)
+}
+
+func printTable(w io.Writer, headers []string, rows [][]string) error {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	for i, h := range headers {
+		if i > 0 {
+			fmt.Fprint(tw, "\t")
+		}
+		fmt.Fprint(tw, h)
+	}
+	fmt.Fprintln(tw)
+
+	for _, row := range rows {
+		for i, col := range row {
+			if i > 0 {
+				fmt.Fprint(tw, "\t")
+			}
+			fmt.Fprint(tw, col)
+		}
+		fmt.Fprintln(tw)
+	}
+	return tw.Flush()
+}
