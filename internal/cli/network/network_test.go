@@ -152,3 +152,177 @@ func TestDeviceCmd_gateway_noClientsRow(t *testing.T) {
 		t.Errorf("expected formatted uptime in output, got:\n%s", out)
 	}
 }
+
+func TestClientsCmd_tableOutput(t *testing.T) {
+	ip1 := "192.168.1.101"
+	ip2 := "192.168.1.10"
+	stub := &StubClient{
+		ListNetworkClientsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.NetworkClientList{
+				Items: []gen.NetworkClient{
+					{
+						Id:             "unifi.macbook-pro-3c",
+						Name:           "MacBook Pro",
+						Mac:            "3c:22:fb:09:aa:b1",
+						Ip:             &ip1,
+						ConnectionType: "wireless",
+					},
+					{
+						Id:             "unifi.nas-1-68",
+						Name:           "nas-1",
+						Mac:            "68:d7:9a:12:bb:c2",
+						Ip:             &ip2,
+						ConnectionType: "wired",
+					},
+				},
+			}), nil
+		},
+	}
+
+	cmd := newClientsCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{
+		"unifi.macbook-pro-3c", "MacBook Pro", "wireless",
+		"unifi.nas-1-68", "nas-1", "wired",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestClientsCmd_apiError(t *testing.T) {
+	stub := &StubClient{
+		ListNetworkClientsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusUnauthorized, map[string]any{
+				"type":   "https://homelab.local/problems/unauthorized",
+				"title":  "Unauthorized",
+				"status": 401,
+				"detail": "Bearer token missing",
+			}), nil
+		},
+	}
+
+	cmd := newClientsCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Unauthorized") {
+		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
+	}
+}
+
+func TestClientCmd_wireless(t *testing.T) {
+	ip := "192.168.1.101"
+	stub := &StubClient{
+		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.WirelessNetworkClientDetail{
+				ConnectionType: gen.Wireless,
+				Id:             "unifi.macbook-pro-3c",
+				Name:           "MacBook Pro",
+				Mac:            "3c:22:fb:09:aa:b1",
+				Ip:             &ip,
+				Ssid:           "HomeNetwork",
+				SignalStrength:  -62,
+				Uptime:         7200,
+			}), nil
+		},
+	}
+
+	cmd := newClientCmd(stub)
+	cmd.SetArgs([]string{"unifi.macbook-pro-3c"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"HomeNetwork", "-62 dBm", "2h 0m 0s", "wireless"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	for _, absent := range []string{"SWITCH", "SWITCH PORT"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected no %q row for wireless client, got:\n%s", absent, out)
+		}
+	}
+}
+
+func TestClientCmd_wired(t *testing.T) {
+	ip := "192.168.1.10"
+	stub := &StubClient{
+		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.WiredNetworkClientDetail{
+				ConnectionType: gen.WiredNetworkClientDetailConnectionTypeWired,
+				Id:             "unifi.nas-1-68",
+				Name:           "nas-1",
+				Mac:            "68:d7:9a:12:bb:c2",
+				Ip:             &ip,
+				SwitchName:     "Switch Living Room",
+				SwitchPort:     8,
+				Uptime:         604800,
+			}), nil
+		},
+	}
+
+	cmd := newClientCmd(stub)
+	cmd.SetArgs([]string{"unifi.nas-1-68"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"Switch Living Room", "8", "7d 0h 0m 0s", "wired"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	for _, absent := range []string{"SSID", "SIGNAL"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected no %q row for wired client, got:\n%s", absent, out)
+		}
+	}
+}
+
+func TestClientCmd_notFound(t *testing.T) {
+	stub := &StubClient{
+		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusNotFound, map[string]any{
+				"type":   "https://homelab.local/problems/not-found",
+				"title":  "Not Found",
+				"status": 404,
+				"detail": "client 'unifi.foo' does not exist or is offline",
+			}), nil
+		},
+	}
+
+	cmd := newClientCmd(stub)
+	cmd.SetArgs([]string{"unifi.foo"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}
