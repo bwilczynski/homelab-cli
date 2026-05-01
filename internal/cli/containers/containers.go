@@ -273,8 +273,24 @@ func newStartCmd(client ContainersClient) *cobra.Command {
 		Short: "Start a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// implemented in Task 6
-			return fmt.Errorf("not implemented")
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+			resp, err := c.StartContainer(context.Background(), args[0], &gen.StartContainerParams{})
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusNoContent {
+				return apiclient.ParseError(resp)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Container %s started\n", args[0])
+			return nil
 		},
 	}
 }
@@ -285,8 +301,24 @@ func newStopCmd(client ContainersClient) *cobra.Command {
 		Short: "Stop a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// implemented in Task 6
-			return fmt.Errorf("not implemented")
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+			resp, err := c.StopContainer(context.Background(), args[0], &gen.StopContainerParams{})
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusNoContent {
+				return apiclient.ParseError(resp)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Container %s stopped\n", args[0])
+			return nil
 		},
 	}
 }
@@ -297,8 +329,24 @@ func newRestartCmd(client ContainersClient) *cobra.Command {
 		Short: "Restart a container",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// implemented in Task 6
-			return fmt.Errorf("not implemented")
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+			resp, err := c.RestartContainer(context.Background(), args[0], &gen.RestartContainerParams{})
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusNoContent {
+				return apiclient.ParseError(resp)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Container %s restarted\n", args[0])
+			return nil
 		},
 	}
 }

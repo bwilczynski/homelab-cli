@@ -3,6 +3,7 @@ package containers
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -159,5 +160,74 @@ func TestGetCmd_notFound(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Not Found") {
 		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}
+
+func TestStartCmd_success(t *testing.T) {
+	stub := &StubClient{
+		StartContainerFunc: func(_ context.Context, id string, _ *gen.StartContainerParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusNoContent,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		},
+	}
+
+	cmd := newStartCmd(stub)
+	cmd.SetArgs([]string{"nas-1.homeassistant"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "nas-1.homeassistant") {
+		t.Errorf("expected container ID in output, got: %s", buf.String())
+	}
+}
+
+func TestStopCmd_success(t *testing.T) {
+	stub := &StubClient{
+		StopContainerFunc: func(_ context.Context, id string, _ *gen.StopContainerParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusNoContent,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		},
+	}
+
+	cmd := newStopCmd(stub)
+	cmd.SetArgs([]string{"nas-1.homeassistant"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "nas-1.homeassistant") {
+		t.Errorf("expected container ID in output, got: %s", buf.String())
+	}
+}
+
+func TestRestartCmd_success(t *testing.T) {
+	stub := &StubClient{
+		RestartContainerFunc: func(_ context.Context, id string, _ *gen.RestartContainerParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusNoContent,
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		},
+	}
+
+	cmd := newRestartCmd(stub)
+	cmd.SetArgs([]string{"nas-1.homeassistant"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "nas-1.homeassistant") {
+		t.Errorf("expected container ID in output, got: %s", buf.String())
 	}
 }
