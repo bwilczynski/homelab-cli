@@ -94,7 +94,7 @@ func TestInfoCmd_tableOutput(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"nas-1", "DS920+", "7.2.1-69057", "4096 MB"} {
+	for _, want := range []string{"nas-1", "DS920+", "7.2.1-69057", "4.0 GB"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}

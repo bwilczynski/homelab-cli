@@ -136,7 +136,7 @@ func newInfoCmd(client SystemClient) *cobra.Command {
 					info.Device,
 					info.Model,
 					info.Firmware,
-					fmt.Sprintf("%d MB", info.RamMb),
+					output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
 					output.FormatUptime(int(info.UptimeSeconds)),
 				})
 			}
