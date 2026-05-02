@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"sort"
-	"time"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
@@ -165,7 +164,7 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		{"RESTART COUNT", fmt.Sprintf("%d", d.RestartCount)},
 		{"CPU", fmt.Sprintf("%.1f%%", d.Resources.CpuPercent)},
 		{"MEMORY", fmt.Sprintf("%s (%.1f%%)", output.FormatBytes(d.Resources.MemoryBytes), d.Resources.MemoryPercent)},
-		{"STARTED AT", d.StartedAt.Format(time.RFC3339)},
+		{"STARTED AT", output.FormatTime(d.StartedAt)},
 		{"EXIT CODE", fmt.Sprintf("%d", d.ExitCode)},
 		{"OOM KILLED", fmt.Sprintf("%v", d.OomKilled)},
 		{"RESTART POLICY", string(d.RestartPolicy)},
