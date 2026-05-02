@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	gen "github.com/bwilczynski/hlctl/internal/backups"
@@ -143,10 +142,10 @@ func newTaskCmd(client BackupsClient) *cobra.Command {
 				{"TYPE", detail.Type},
 			}
 			if detail.LastRunAt != nil {
-				rows = append(rows, []string{"LAST RUN", detail.LastRunAt.Format(time.RFC3339)})
+				rows = append(rows, []string{"LAST RUN", output.FormatTime(*detail.LastRunAt)})
 			}
 			if detail.NextRunAt != nil {
-				rows = append(rows, []string{"NEXT RUN", detail.NextRunAt.Format(time.RFC3339)})
+				rows = append(rows, []string{"NEXT RUN", output.FormatTime(*detail.NextRunAt)})
 			}
 			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
 		},

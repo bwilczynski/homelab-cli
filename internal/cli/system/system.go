@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
@@ -344,8 +343,8 @@ func newUpdateCmd(client SystemClient) *cobra.Command {
 					{"STATUS", string(d.Status)},
 					{"CURRENT", d.CurrentVersion},
 					{"LATEST", d.LatestVersion},
-					{"CHECKED AT", d.CheckedAt.Format(time.RFC3339)},
-					{"PUBLISHED AT", d.PublishedAt.Format(time.RFC3339)},
+					{"CHECKED AT", output.FormatTime(d.CheckedAt)},
+					{"PUBLISHED AT", output.FormatTime(d.PublishedAt)},
 					{"IMAGE", d.Image},
 					{"SOURCE", d.Source},
 					{"RELEASE URL", d.ReleaseUrl},
