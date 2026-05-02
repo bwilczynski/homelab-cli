@@ -1,10 +1,17 @@
+// internal/cli/system/system.go
 package system
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 
+	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/output"
+	gen "github.com/bwilczynski/hlctl/internal/system"
 	"github.com/spf13/cobra"
 )
 
@@ -14,53 +21,126 @@ func NewCmd() *cobra.Command {
 		Short: "System health and information",
 	}
 
-	cmd.AddCommand(newHealthCmd())
-	cmd.AddCommand(newInfoCmd())
-	cmd.AddCommand(newUtilizationCmd())
-	cmd.AddCommand(newUpdatesCmd())
-	cmd.AddCommand(newUpdateCmd())
-	cmd.AddCommand(newCheckUpdatesCmd())
+	cmd.AddCommand(newHealthCmd(nil))
+	cmd.AddCommand(newInfoCmd(nil))
+	cmd.AddCommand(newUtilizationCmd(nil))
+	cmd.AddCommand(newUpdatesCmd(nil))
+	cmd.AddCommand(newUpdateCmd(nil))
+	cmd.AddCommand(newCheckUpdatesCmd(nil))
 	return cmd
 }
 
-func newHealthCmd() *cobra.Command {
+func buildClient() (SystemClient, error) {
+	httpClient, apiURL, err := apiclient.NewHTTPClient()
+	if err != nil {
+		return nil, err
+	}
+	return NewSystemClient(httpClient, apiURL)
+}
+
+func newHealthCmd(client SystemClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "health",
 		Short: "Show aggregate system health",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			data := map[string]any{
-				"status": "healthy",
-				"components": []map[string]string{
-					{"name": "nas-1", "status": "healthy"},
-					{"name": "unifi", "status": "healthy"},
-				},
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
 			}
+
+			resp, err := c.GetSystemHealth(context.Background())
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var health gen.Health
+			if err := json.Unmarshal(body, &health); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
 			headers := []string{"COMPONENT", "STATUS"}
-			rows := [][]string{
-				{"nas-1", "healthy"},
-				{"unifi", "healthy"},
+			var rows [][]string
+			for _, comp := range health.Components {
+				rows = append(rows, []string{comp.Name, string(comp.Status)})
 			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), health, headers, rows)
 		},
 	}
 }
 
-func newInfoCmd() *cobra.Command {
+func newInfoCmd(client SystemClient) *cobra.Command {
 	var device string
 
 	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "Show device information",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			data := []map[string]string{
-				{"device": "nas-1", "model": "DS920+", "firmware": "7.2.1-69057", "uptime": "45d 12h"},
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
 			}
-			headers := []string{"DEVICE", "MODEL", "FIRMWARE", "UPTIME"}
+
+			params := &gen.ListSystemInfoParams{}
+			if device != "" {
+				params.Device = &device
+			}
+
+			resp, err := c.ListSystemInfo(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.SystemInfoList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			headers := []string{"DEVICE", "MODEL", "FIRMWARE", "RAM", "UPTIME"}
 			var rows [][]string
-			for _, d := range data {
-				rows = append(rows, []string{d["device"], d["model"], d["firmware"], d["uptime"]})
+			for _, info := range list.Items {
+				rows = append(rows, []string{
+					info.Device,
+					info.Model,
+					info.Firmware,
+					output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
+					output.FormatUptime(int(info.UptimeSeconds)),
+				})
 			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
 		},
 	}
 
@@ -68,22 +148,65 @@ func newInfoCmd() *cobra.Command {
 	return cmd
 }
 
-func newUtilizationCmd() *cobra.Command {
+func newUtilizationCmd(client SystemClient) *cobra.Command {
 	var device string
 
 	cmd := &cobra.Command{
 		Use:   "utilization",
 		Short: "Show live resource utilization",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			data := []map[string]string{
-				{"device": "nas-1", "cpu": "12%", "memory": "68%", "swap": "0%"},
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
 			}
+
+			params := &gen.ListSystemUtilizationParams{}
+			if device != "" {
+				params.Device = &device
+			}
+
+			resp, err := c.ListSystemUtilization(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.SystemUtilizationList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
 			headers := []string{"DEVICE", "CPU", "MEMORY", "SWAP"}
 			var rows [][]string
-			for _, d := range data {
-				rows = append(rows, []string{d["device"], d["cpu"], d["memory"], d["swap"]})
+			for _, u := range list.Items {
+				swapPct := 0
+				if u.Memory.SwapTotalBytes > 0 {
+					swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
+				}
+				rows = append(rows, []string{
+					u.Device,
+					fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
+					fmt.Sprintf("%d%%", u.Memory.UsedPercent),
+					fmt.Sprintf("%d%%", swapPct),
+				})
 			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
 		},
 	}
 
@@ -91,63 +214,187 @@ func newUtilizationCmd() *cobra.Command {
 	return cmd
 }
 
-func newUpdatesCmd() *cobra.Command {
+func newUpdatesCmd(client SystemClient) *cobra.Command {
 	var status, updateType string
 
 	cmd := &cobra.Command{
 		Use:   "updates",
 		Short: "List tracked software updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			data := []map[string]string{
-				{"id": "nas-1.homeassistant", "type": "container", "current": "2024.1.0", "latest": "2024.2.0", "status": "available"},
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
 			}
-			headers := []string{"ID", "TYPE", "CURRENT", "LATEST", "STATUS"}
-			var rows [][]string
-			for _, d := range data {
-				rows = append(rows, []string{d["id"], d["type"], d["current"], d["latest"], d["status"]})
+
+			params := &gen.ListSystemUpdatesParams{}
+			if status != "" {
+				s := gen.UpdateStatusFilter(status)
+				params.Status = &s
 			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
+			if updateType != "" {
+				ut := gen.UpdateTypeFilter(updateType)
+				params.Type = &ut
+			}
+
+			resp, err := c.ListSystemUpdates(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.SystemUpdateList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			return printUpdateList(cmd.OutOrStdout(), list)
 		},
 	}
 
-	cmd.Flags().StringVar(&status, "status", "", "Filter by update status")
-	cmd.Flags().StringVar(&updateType, "type", "", "Filter by component type")
+	cmd.Flags().StringVar(&status, "status", "", "Filter by update status (unknown, upToDate, updateAvailable)")
+	cmd.Flags().StringVar(&updateType, "type", "", "Filter by component type (container)")
 	return cmd
 }
 
-func newUpdateCmd() *cobra.Command {
+func printUpdateList(w io.Writer, list gen.SystemUpdateList) error {
+	headers := []string{"ID", "NAME", "DEVICE", "TYPE", "STATUS", "CURRENT", "LATEST"}
+	var rows [][]string
+	for _, u := range list.Items {
+		rows = append(rows, []string{
+			u.Id, u.Name, u.Device,
+			string(u.Type), string(u.Status),
+			u.CurrentVersion, u.LatestVersion,
+		})
+	}
+	return output.Print(w, output.FormatTable, list, headers, rows)
+}
+
+func newUpdateCmd(client SystemClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "update <update-id>",
 		Short: "Show update details for a tracked component",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			data := map[string]any{
-				"id":      args[0],
-				"type":    "container",
-				"current": "2024.1.0",
-				"latest":  "2024.2.0",
-				"status":  "available",
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
 			}
-			headers := []string{"FIELD", "VALUE"}
-			rows := [][]string{
-				{"ID", args[0]},
-				{"Type", "container"},
-				{"Current", "2024.1.0"},
-				{"Latest", "2024.2.0"},
-				{"Status", "available"},
+
+			resp, err := c.GetSystemUpdate(context.Background(), args[0])
+			if err != nil {
+				return err
 			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), data, headers, rows)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var detail gen.SystemUpdateDetail
+			if err := json.Unmarshal(body, &detail); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			disc, err := detail.Discriminator()
+			if err != nil {
+				return err
+			}
+
+			switch disc {
+			case "container":
+				d, err := detail.AsContainerSystemUpdateDetail()
+				if err != nil {
+					return err
+				}
+				headers := []string{"FIELD", "VALUE"}
+				rows := [][]string{
+					{"ID", d.Id},
+					{"NAME", d.Name},
+					{"DEVICE", d.Device},
+					{"TYPE", string(d.Type)},
+					{"STATUS", string(d.Status)},
+					{"CURRENT", d.CurrentVersion},
+					{"LATEST", d.LatestVersion},
+					{"CHECKED AT", output.FormatTime(d.CheckedAt)},
+					{"PUBLISHED AT", output.FormatTime(d.PublishedAt)},
+					{"IMAGE", d.Image},
+					{"SOURCE", d.Source},
+					{"RELEASE URL", d.ReleaseUrl},
+				}
+				return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
+			default:
+				return fmt.Errorf("unknown update type: %s", disc)
+			}
 		},
 	}
 }
 
-func newCheckUpdatesCmd() *cobra.Command {
+func newCheckUpdatesCmd(client SystemClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "check-updates",
 		Short: "Force check for upstream updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), "Update check triggered")
-			return nil
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			resp, err := c.CheckSystemUpdates(context.Background(), &gen.CheckSystemUpdatesParams{})
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.SystemUpdateList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			return printUpdateList(cmd.OutOrStdout(), list)
 		},
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"time"
 )
 
 type Format string
@@ -68,6 +69,12 @@ func FormatBytes(n int64) string {
 	}
 	units := []string{"KB", "MB", "GB", "TB", "PB"}
 	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
+}
+
+// FormatTime formats a time value in the local timezone using RFC3339 layout,
+// which includes the UTC offset (e.g. "2026-04-30T05:00:00+02:00").
+func FormatTime(t time.Time) string {
+	return t.Local().Format(time.RFC3339)
 }
 
 // FormatUptime converts seconds to a human-readable duration string.
