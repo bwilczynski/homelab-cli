@@ -135,6 +135,41 @@ func TestTaskCmd_noDates(t *testing.T) {
 	}
 }
 
+func TestTaskCmd_withSizeAndFolders(t *testing.T) {
+	size := gen.Bytes(10737418240)
+	folders := []string{"/volume1/photos", "/volume1/documents"}
+	stub := &StubClient{
+		GetBackupTaskFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.BackupTaskDetail{
+				Id:      "nas-1.daily-backup",
+				Name:    "Daily Backup",
+				Device:  "nas-1",
+				Status:  gen.Idle,
+				LastResult: gen.Success,
+				Type:    "hyperBackup",
+				Size:    &size,
+				Folders: &folders,
+			}), nil
+		},
+	}
+
+	cmd := newTaskCmd(stub)
+	cmd.SetArgs([]string{"nas-1.daily-backup"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"SIZE", "10.0 GB", "FOLDERS", "/volume1/photos", "/volume1/documents"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
 func TestTaskCmd_apiError(t *testing.T) {
 	stub := &StubClient{
 		GetBackupTaskFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {

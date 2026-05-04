@@ -147,6 +147,18 @@ func newTaskCmd(client BackupsClient) *cobra.Command {
 			if detail.NextRunAt != nil {
 				rows = append(rows, []string{"NEXT RUN", output.FormatTime(*detail.NextRunAt)})
 			}
+			if detail.Size != nil {
+				rows = append(rows, []string{"SIZE", output.FormatBytes(*detail.Size)})
+			}
+			if detail.Folders != nil && len(*detail.Folders) > 0 {
+				for i, folder := range *detail.Folders {
+					label := "FOLDERS"
+					if i > 0 {
+						label = ""
+					}
+					rows = append(rows, []string{label, folder})
+				}
+			}
 			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
 		},
 	}
