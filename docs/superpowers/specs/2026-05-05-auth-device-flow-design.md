@@ -23,7 +23,7 @@ hlctl auth logout    # deletes ~/.config/homelab/credentials.json
 
 1. Resolve API URL (flag → `HOMELAB_API_URL` env → `~/.config/homelab/config.yaml`)
 2. `GET {apiURL}/.well-known/homelab` → `{enabled bool, issuer string}`
-   - If `enabled: false` → exit with `authentication is not enabled on this server`
+   - If `enabled: false` → print `Server does not require authentication.` and exit successfully (no error)
 3. Read `client_id` from CLI config (`oidc_client_id`), defaulting to `"homelab-cli"`
 4. `GET {issuer}/.well-known/openid-configuration` → `{device_authorization_endpoint, token_endpoint}`
 5. `POST device_authorization_endpoint` with `client_id`, `scope=openid profile email offline_access` → `{device_code, user_code, verification_uri_complete, expires_in, interval}`
@@ -59,22 +59,21 @@ type Credentials struct {
 
 ## Token Refresh & Transport
 
-`NewAuthenticatedTransport(base http.RoundTripper) (http.RoundTripper, error)`:
+`NewAuthenticatedTransport(base http.RoundTripper) http.RoundTripper`:
 
-- If `HOMELAB_TOKEN` env is set → return a static-token transport (no refresh; existing behaviour)
-- Otherwise:
-  1. `LoadCredentials()` — error if file absent (`not logged in (run 'hlctl auth login')`)
-  2. Build `oauth2.Config{ClientID, Endpoint{TokenURL: creds.TokenEndpoint}}`
-  3. Create `oauth2.ReuseTokenSource(storedToken, cfg.TokenSource(ctx, storedToken))`
-  4. Wrap with `diskSavingTokenSource` — saves to `credentials.json` only when `AccessToken` changes
-  5. Return `&oauth2.Transport{Source: diskSavingTokenSource, Base: base}`
+- If `HOMELAB_TOKEN` env is set → inject that token statically on every request (no refresh; existing behaviour)
+- If `credentials.json` exists → build `oauth2.Config{ClientID, Endpoint{TokenURL}}`, create `oauth2.ReuseTokenSource`, wrap with `diskSavingTokenSource`, return `&oauth2.Transport{Source: ..., Base: base}`
+- If neither → return a pass-through transport that sends requests with **no `Authorization` header** (correct when server has auth disabled)
 
 `oauth2.ReuseTokenSource` caches the token in memory and only calls the underlying source (triggering a refresh HTTP request) when the token is within the expiry window. After a refresh, `diskSavingTokenSource` persists the new tokens to disk.
 
 If the refresh token is itself expired, `oauth2` returns an error; the transport wraps it as:
 > `session expired (run 'hlctl auth login')`
 
-`apiclient.NewHTTPClient()` calls `NewAuthenticatedTransport()` instead of constructing `&auth.AuthenticatedTransport{}` directly.
+If the API returns 401 and the user has no credentials, the `apiclient` error handler surfaces:
+> `not authenticated (run 'hlctl auth login')`
+
+`apiclient.NewHTTPClient()` calls `NewAuthenticatedTransport()` — it no longer returns an error since transport construction is always successful.
 
 ## CLI Config Extension
 
@@ -93,11 +92,12 @@ No new `hlctl config` subcommand needed for now — the default covers the commo
 
 | Situation | Message |
 |---|---|
-| No credentials.json | `not logged in (run 'hlctl auth login')` |
+| No credentials + API returns 401 | `not authenticated (run 'hlctl auth login')` |
 | Refresh token expired | `session expired (run 'hlctl auth login')` |
 | Device flow timeout | `device authorization expired` |
 | Device flow denied | `authorization denied` |
-| Auth disabled on server | `authentication is not enabled on this server` |
+| Auth disabled on server (`enabled: false`) | `Server does not require authentication.` (success) |
+| No credentials + auth disabled | requests proceed without Authorization header (success) |
 | `hlctl auth logout` | deletes credentials.json, prints `Logged out.` |
 
 ## Files Changed
