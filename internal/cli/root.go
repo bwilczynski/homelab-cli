@@ -1,11 +1,11 @@
 package cli
 
 import (
+	authcli "github.com/bwilczynski/hlctl/internal/cli/auth"
 	"github.com/bwilczynski/hlctl/internal/cli/backups"
 	"github.com/bwilczynski/hlctl/internal/cli/config"
 	"github.com/bwilczynski/hlctl/internal/cli/containers"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	"github.com/bwilczynski/hlctl/internal/cli/login"
 	"github.com/bwilczynski/hlctl/internal/cli/network"
 	"github.com/bwilczynski/hlctl/internal/cli/storage"
 	"github.com/bwilczynski/hlctl/internal/cli/system"
@@ -21,10 +21,10 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&flags.OutputFormat, "output", "o", "table", "Output format: table or json")
 	rootCmd.PersistentFlags().StringVar(&flags.APIURL, "api-url", "", "Override API base URL")
+	rootCmd.AddCommand(authcli.NewCmd())
 	rootCmd.AddCommand(backups.NewCmd())
 	rootCmd.AddCommand(config.NewCmd())
 	rootCmd.AddCommand(containers.NewCmd())
-	rootCmd.AddCommand(login.NewCmd())
 	rootCmd.AddCommand(network.NewCmd())
 	rootCmd.AddCommand(storage.NewCmd())
 	rootCmd.AddCommand(system.NewCmd())
