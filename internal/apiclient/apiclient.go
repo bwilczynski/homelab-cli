@@ -26,7 +26,7 @@ func NewHTTPClient() (*http.Client, string, error) {
 	}
 
 	httpClient := &http.Client{
-		Transport: &auth.AuthenticatedTransport{},
+		Transport: auth.NewAuthenticatedTransport(nil),
 	}
 	return httpClient, apiURL, nil
 }
