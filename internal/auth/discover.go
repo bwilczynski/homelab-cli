@@ -22,6 +22,9 @@ func DiscoverHomelab(apiURL string) (*HomelabInfo, error) {
 		return nil, fmt.Errorf("reaching API: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("homelab discovery returned status %d", resp.StatusCode)
+	}
 
 	var info HomelabInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
@@ -36,6 +39,9 @@ func DiscoverOIDC(issuer string) (*OIDCEndpoints, error) {
 		return nil, fmt.Errorf("reaching OIDC provider: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("OIDC discovery returned status %d", resp.StatusCode)
+	}
 
 	var endpoints OIDCEndpoints
 	if err := json.NewDecoder(resp.Body).Decode(&endpoints); err != nil {
