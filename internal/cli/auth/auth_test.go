@@ -23,10 +23,17 @@ func writeTempCredentials(t *testing.T) string {
 		ClientID:      "homelab-cli",
 		TokenEndpoint: "http://localhost/token",
 	}
-	data, _ := json.MarshalIndent(creds, "", "  ")
+	data, err := json.MarshalIndent(creds, "", "  ")
+	if err != nil {
+		t.Fatalf("marshalling credentials: %v", err)
+	}
 	path := filepath.Join(dir, ".config", "homelab", "credentials.json")
-	os.MkdirAll(filepath.Dir(path), 0o700)
-	os.WriteFile(path, data, 0o600)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatalf("creating credentials dir: %v", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("writing credentials: %v", err)
+	}
 	t.Setenv("HOME", dir)
 	return path
 }
