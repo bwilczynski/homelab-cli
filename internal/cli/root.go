@@ -13,9 +13,10 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "hlctl",
-	Short: "CLI for controlling homelab services",
-	Long:  "hlctl is a command-line interface for managing your homelab infrastructure via the Homelab API.",
+	Use:          "hlctl",
+	Short:        "CLI for controlling homelab services",
+	Long:         "hlctl is a command-line interface for managing your homelab infrastructure via the Homelab API.",
+	SilenceUsage: true,
 }
 
 func init() {
