@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/bwilczynski/hlctl/internal/config"
-	_ "golang.org/x/oauth2"
 )
 
 type Credentials struct {
