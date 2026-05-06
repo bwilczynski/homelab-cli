@@ -76,7 +76,7 @@ func Login(ctx context.Context, endpoints *OIDCEndpoints, clientID string, w io.
 		}, nil
 	}
 
-	return nil, fmt.Errorf("device authorization expired")
+	return nil, fmt.Errorf("device authorization timed out")
 }
 
 func requestDeviceCode(ctx context.Context, endpoint, clientID string) (*deviceCodeResponse, error) {
