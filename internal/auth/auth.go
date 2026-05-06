@@ -60,7 +60,7 @@ func LoadCredentials() (*Credentials, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("not logged in (run 'hlctl auth login')")
 		}
 		return nil, err
@@ -96,7 +96,7 @@ func DeleteCredentials() error {
 		return err
 	}
 	err = os.Remove(path)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	return err
@@ -154,6 +154,10 @@ type diskSavingTokenSource struct {
 	tokenEndpoint string
 }
 
+// Token returns a valid token, refreshing via the token endpoint if needed.
+// The network call runs outside the mutex; the lock guards only the in-memory
+// lastToken comparison and disk write, so concurrent callers may each trigger
+// a save but will write equivalent content.
 func (s *diskSavingTokenSource) Token() (*oauth2.Token, error) {
 	tok, err := s.src.Token()
 	if err != nil {
