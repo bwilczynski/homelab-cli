@@ -1,8 +1,8 @@
-package: backups
+package: docker
 generate:
   client: true
   models: true
-output: internal/backups/api.gen.go
+output: internal/docker/api.gen.go
 output-options:
   include-tags:
-    - backups
+    - docker
