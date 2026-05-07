@@ -10,6 +10,9 @@ import (
 	gen "github.com/bwilczynski/hlctl/internal/docker"
 )
 
+// StubClient is a ContainersClient that delegates each method to a configurable
+// function field. Use in tests to inject controlled responses.
+// When a function field is nil the method panics — always set the field under test.
 type StubClient struct {
 	ListContainersFunc   func(ctx context.Context, params *gen.ListContainersParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetContainerFunc     func(ctx context.Context, containerId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
@@ -38,6 +41,7 @@ func (s *StubClient) RestartContainer(ctx context.Context, containerId string, p
 	return s.RestartContainerFunc(ctx, containerId, params, reqEditors...)
 }
 
+// jsonResponse builds an *http.Response with a JSON body and the given status code.
 func jsonResponse(status int, body any) *http.Response {
 	b, _ := json.Marshal(body)
 	return &http.Response{
