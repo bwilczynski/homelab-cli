@@ -14,7 +14,8 @@ const (
 )
 
 type Config struct {
-	APIURL string `yaml:"api_url"`
+	APIURL       string `yaml:"api_url"`
+	OIDCClientID string `yaml:"oidc_client_id"`
 }
 
 func Dir() (string, error) {
@@ -80,6 +81,14 @@ func (c *Config) ResolveAPIURL() (string, error) {
 		return c.APIURL, nil
 	}
 	return "", fmt.Errorf("API URL not configured (run 'hlctl config set-url' or set %s)", envAPIURL)
+}
+
+// ClientID returns the configured OIDC client ID, defaulting to "homelab-cli".
+func (c *Config) ClientID() string {
+	if c.OIDCClientID != "" {
+		return c.OIDCClientID
+	}
+	return "homelab-cli"
 }
 
 // Token returns the token from env var, or empty string if not set.
