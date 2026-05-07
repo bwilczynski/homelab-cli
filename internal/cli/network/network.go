@@ -19,11 +19,8 @@ func NewCmd() *cobra.Command {
 		Use:   "network",
 		Short: "Network devices and clients",
 	}
-
-	cmd.AddCommand(newDevicesCmd(nil))
-	cmd.AddCommand(newDeviceCmd(nil))
-	cmd.AddCommand(newClientsCmd(nil))
-	cmd.AddCommand(newClientCmd(nil))
+	cmd.AddCommand(newDevicesCmd())
+	cmd.AddCommand(newClientsCmd())
 	return cmd
 }
 
@@ -35,9 +32,19 @@ func buildClient() (NetworkClient, error) {
 	return NewNetworkClient(httpClient, apiURL)
 }
 
-func newDevicesCmd(client NetworkClient) *cobra.Command {
-	return &cobra.Command{
+func newDevicesCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "devices",
+		Short: "Network devices",
+	}
+	cmd.AddCommand(newListDevicesCmd(nil))
+	cmd.AddCommand(newGetDeviceCmd(nil))
+	return cmd
+}
+
+func newListDevicesCmd(client NetworkClient) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
 		Short: "List network devices",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client
@@ -90,9 +97,9 @@ func newDevicesCmd(client NetworkClient) *cobra.Command {
 	}
 }
 
-func newDeviceCmd(client NetworkClient) *cobra.Command {
+func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 	return &cobra.Command{
-		Use:   "device <device-id>",
+		Use:   "get <device-id>",
 		Short: "Show network device details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -150,9 +157,19 @@ func newDeviceCmd(client NetworkClient) *cobra.Command {
 	}
 }
 
-func newClientsCmd(client NetworkClient) *cobra.Command {
-	return &cobra.Command{
+func newClientsCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "clients",
+		Short: "Connected network clients",
+	}
+	cmd.AddCommand(newListClientsCmd(nil))
+	cmd.AddCommand(newGetClientCmd(nil))
+	return cmd
+}
+
+func newListClientsCmd(client NetworkClient) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
 		Short: "List connected network clients",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client
@@ -204,9 +221,9 @@ func newClientsCmd(client NetworkClient) *cobra.Command {
 	}
 }
 
-func newClientCmd(client NetworkClient) *cobra.Command {
+func newGetClientCmd(client NetworkClient) *cobra.Command {
 	return &cobra.Command{
-		Use:   "client <client-id>",
+		Use:   "get <client-id>",
 		Short: "Show network client details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
