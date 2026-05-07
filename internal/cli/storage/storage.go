@@ -17,11 +17,10 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "storage",
-		Short: "NAS storage volumes",
+		Short: "NAS storage resources",
 	}
-
-	cmd.AddCommand(newVolumesCmd(nil))
-	cmd.AddCommand(newVolumeCmd(nil))
+	cmd.AddCommand(newVolumesCmd())
+	cmd.AddCommand(newBackupsCmd())
 	return cmd
 }
 
@@ -33,11 +32,21 @@ func buildClient() (StorageClient, error) {
 	return NewStorageClient(httpClient, apiURL)
 }
 
-func newVolumesCmd(client StorageClient) *cobra.Command {
+func newVolumesCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "volumes",
+		Short: "Storage volumes",
+	}
+	cmd.AddCommand(newListVolumesCmd(nil))
+	cmd.AddCommand(newGetVolumeCmd(nil))
+	return cmd
+}
+
+func newListVolumesCmd(client StorageClient) *cobra.Command {
 	var device string
 
 	cmd := &cobra.Command{
-		Use:   "volumes",
+		Use:   "list",
 		Short: "List storage volumes",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client
@@ -95,9 +104,9 @@ func newVolumesCmd(client StorageClient) *cobra.Command {
 	return cmd
 }
 
-func newVolumeCmd(client StorageClient) *cobra.Command {
+func newGetVolumeCmd(client StorageClient) *cobra.Command {
 	return &cobra.Command{
-		Use:   "volume <volume-id>",
+		Use:   "get <volume-id>",
 		Short: "Show volume details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -177,4 +186,144 @@ func printVolumeDetail(cmd *cobra.Command, d gen.VolumeDetail) error {
 	}
 
 	return nil
+}
+
+func newBackupsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "backups",
+		Short: "Backup tasks and history",
+	}
+	cmd.AddCommand(newListBackupsCmd(nil))
+	cmd.AddCommand(newGetBackupCmd(nil))
+	return cmd
+}
+
+func newListBackupsCmd(client StorageClient) *cobra.Command {
+	var device string
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List backups",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			params := &gen.ListBackupsParams{}
+			if device != "" {
+				params.Device = &device
+			}
+
+			resp, err := c.ListBackups(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.BackupTaskList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			headers := []string{"ID", "NAME", "DEVICE", "STATUS", "LAST RESULT", "TYPE"}
+			var rows [][]string
+			for _, t := range list.Items {
+				rows = append(rows, []string{
+					t.Id, t.Name, t.Device,
+					string(t.Status), string(t.LastResult), t.Type,
+				})
+			}
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+		},
+	}
+
+	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
+	return cmd
+}
+
+func newGetBackupCmd(client StorageClient) *cobra.Command {
+	return &cobra.Command{
+		Use:   "get <backup-id>",
+		Short: "Show backup details",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			resp, err := c.GetBackup(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var detail gen.BackupTaskDetail
+			if err := json.Unmarshal(body, &detail); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			headers := []string{"FIELD", "VALUE"}
+			rows := [][]string{
+				{"ID", detail.Id},
+				{"NAME", detail.Name},
+				{"DEVICE", detail.Device},
+				{"STATUS", string(detail.Status)},
+				{"LAST RESULT", string(detail.LastResult)},
+				{"TYPE", detail.Type},
+			}
+			if detail.LastRunAt != nil {
+				rows = append(rows, []string{"LAST RUN", output.FormatTime(*detail.LastRunAt)})
+			}
+			if detail.NextRunAt != nil {
+				rows = append(rows, []string{"NEXT RUN", output.FormatTime(*detail.NextRunAt)})
+			}
+			if detail.Size != nil {
+				rows = append(rows, []string{"SIZE", output.FormatBytes(*detail.Size)})
+			}
+			if detail.Folders != nil && len(*detail.Folders) > 0 {
+				for i, folder := range *detail.Folders {
+					label := "FOLDERS"
+					if i > 0 {
+						label = ""
+					}
+					rows = append(rows, []string{label, folder})
+				}
+			}
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
+		},
+	}
 }

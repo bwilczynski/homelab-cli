@@ -1,4 +1,3 @@
-// internal/cli/storage/client.go
 package storage
 
 import (
@@ -12,6 +11,8 @@ import (
 type StorageClient interface {
 	ListStorageVolumes(ctx context.Context, params *gen.ListStorageVolumesParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetStorageVolume(ctx context.Context, volumeId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListBackups(ctx context.Context, params *gen.ListBackupsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetBackup(ctx context.Context, backupId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 }
 
 // NewStorageClient constructs a StorageClient backed by the real API.
