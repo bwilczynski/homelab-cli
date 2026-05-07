@@ -1,8 +1,0 @@
-package: containers
-generate:
-  client: true
-  models: true
-output: internal/containers/api.gen.go
-output-options:
-  include-tags:
-    - containers

@@ -1,14 +1,13 @@
-package containers
+package docker
 
 import (
 	"context"
 	"net/http"
 
-	gen "github.com/bwilczynski/hlctl/internal/containers"
+	gen "github.com/bwilczynski/hlctl/internal/docker"
 )
 
-// ContainersClient is the interface used by containers commands.
-// It matches the subset of gen.ClientInterface that containers commands need.
+// ContainersClient is the interface used by docker containers commands.
 type ContainersClient interface {
 	ListContainers(ctx context.Context, params *gen.ListContainersParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetContainer(ctx context.Context, containerId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)

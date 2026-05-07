@@ -1,4 +1,3 @@
-// internal/cli/storage/stub.go
 package storage
 
 import (
@@ -17,6 +16,8 @@ import (
 type StubClient struct {
 	ListStorageVolumesFunc func(ctx context.Context, params *gen.ListStorageVolumesParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetStorageVolumeFunc   func(ctx context.Context, volumeId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListBackupsFunc        func(ctx context.Context, params *gen.ListBackupsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetBackupFunc          func(ctx context.Context, backupId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 }
 
 func (s *StubClient) ListStorageVolumes(ctx context.Context, params *gen.ListStorageVolumesParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
@@ -25,6 +26,14 @@ func (s *StubClient) ListStorageVolumes(ctx context.Context, params *gen.ListSto
 
 func (s *StubClient) GetStorageVolume(ctx context.Context, volumeId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
 	return s.GetStorageVolumeFunc(ctx, volumeId, reqEditors...)
+}
+
+func (s *StubClient) ListBackups(ctx context.Context, params *gen.ListBackupsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.ListBackupsFunc(ctx, params, reqEditors...)
+}
+
+func (s *StubClient) GetBackup(ctx context.Context, backupId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.GetBackupFunc(ctx, backupId, reqEditors...)
 }
 
 // jsonResponse builds an *http.Response with a JSON body and the given status code.
