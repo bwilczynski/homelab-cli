@@ -137,7 +137,7 @@ func TestUtilizationCmd_tableOutput(t *testing.T) {
 	}
 }
 
-func TestUpdatesCmd_tableOutput(t *testing.T) {
+func TestListUpdatesCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
 		ListSystemUpdatesFunc: func(_ context.Context, _ *gen.ListSystemUpdatesParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
 			return jsonResponse(http.StatusOK, gen.SystemUpdateList{
@@ -173,7 +173,7 @@ func TestUpdatesCmd_tableOutput(t *testing.T) {
 	}
 }
 
-func TestUpdateCmd_containerType(t *testing.T) {
+func TestGetUpdateCmd_containerType(t *testing.T) {
 	stub := &StubClient{
 		GetSystemUpdateFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
 			return jsonResponse(http.StatusOK, gen.ContainerSystemUpdateDetail{
@@ -214,7 +214,7 @@ func TestUpdateCmd_containerType(t *testing.T) {
 	}
 }
 
-func TestUpdateCmd_apiError(t *testing.T) {
+func TestGetUpdateCmd_apiError(t *testing.T) {
 	stub := &StubClient{
 		GetSystemUpdateFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
 			return jsonResponse(http.StatusNotFound, map[string]any{
