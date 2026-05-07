@@ -1,4 +1,4 @@
-package containers
+package docker
 
 import (
 	"context"
@@ -10,22 +10,17 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	gen "github.com/bwilczynski/hlctl/internal/containers"
+	gen "github.com/bwilczynski/hlctl/internal/docker"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "containers",
-		Short: "Manage Docker containers",
+		Use:   "docker",
+		Short: "Docker resources",
 	}
-
-	cmd.AddCommand(newListCmd(nil))
-	cmd.AddCommand(newGetCmd(nil))
-	cmd.AddCommand(newStartCmd(nil))
-	cmd.AddCommand(newStopCmd(nil))
-	cmd.AddCommand(newRestartCmd(nil))
+	cmd.AddCommand(newContainersCmd())
 	return cmd
 }
 
@@ -35,6 +30,19 @@ func buildClient() (ContainersClient, error) {
 		return nil, err
 	}
 	return NewContainersClient(httpClient, apiURL)
+}
+
+func newContainersCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "containers",
+		Short: "Manage Docker containers",
+	}
+	cmd.AddCommand(newListCmd(nil))
+	cmd.AddCommand(newGetCmd(nil))
+	cmd.AddCommand(newStartCmd(nil))
+	cmd.AddCommand(newStopCmd(nil))
+	cmd.AddCommand(newRestartCmd(nil))
+	return cmd
 }
 
 func newListCmd(client ContainersClient) *cobra.Command {
@@ -77,7 +85,6 @@ func newListCmd(client ContainersClient) *cobra.Command {
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				// Pass through raw server JSON without re-encoding to preserve exact formatting.
 				fmt.Fprint(cmd.OutOrStdout(), string(body))
 				return nil
 			}
@@ -135,7 +142,6 @@ func newGetCmd(client ContainersClient) *cobra.Command {
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				// Pass through raw server JSON without re-encoding to preserve exact formatting.
 				fmt.Fprint(cmd.OutOrStdout(), string(body))
 				return nil
 			}
@@ -153,7 +159,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		memoryLimit = output.FormatBytes(d.MemoryLimit)
 	}
 
-	// Flat fields
 	headers := []string{"FIELD", "VALUE"}
 	rows := [][]string{
 		{"ID", d.Id},
@@ -175,7 +180,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		return err
 	}
 
-	// Port bindings
 	if len(d.PortBindings) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "PORT BINDINGS")
@@ -192,7 +196,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		}
 	}
 
-	// Networks
 	if len(d.Networks) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "NETWORKS")
@@ -205,7 +208,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		}
 	}
 
-	// Volume bindings
 	if len(d.VolumeBindings) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "VOLUME BINDINGS")
@@ -218,7 +220,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		}
 	}
 
-	// Environment variables
 	if len(d.EnvVariables) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "ENVIRONMENT VARIABLES")
@@ -231,7 +232,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		}
 	}
 
-	// Entrypoint
 	if len(d.Entrypoint) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "ENTRYPOINT")
@@ -240,7 +240,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		}
 	}
 
-	// Command
 	if len(d.Cmd) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "COMMAND")
@@ -249,7 +248,6 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 		}
 	}
 
-	// Labels
 	if d.Labels != nil && len(*d.Labels) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "LABELS")
