@@ -157,7 +157,7 @@ func TestUpdatesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newUpdatesCmd(stub)
+	cmd := newListUpdatesCmd(stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -193,7 +193,7 @@ func TestUpdateCmd_containerType(t *testing.T) {
 		},
 	}
 
-	cmd := newUpdateCmd(stub)
+	cmd := newGetUpdateCmd(stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -226,7 +226,7 @@ func TestUpdateCmd_apiError(t *testing.T) {
 		},
 	}
 
-	cmd := newUpdateCmd(stub)
+	cmd := newGetUpdateCmd(stub)
 	cmd.SetArgs([]string{"nas-1.foo"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)

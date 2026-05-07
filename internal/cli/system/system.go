@@ -24,8 +24,17 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(newHealthCmd(nil))
 	cmd.AddCommand(newInfoCmd(nil))
 	cmd.AddCommand(newUtilizationCmd(nil))
-	cmd.AddCommand(newUpdatesCmd(nil))
-	cmd.AddCommand(newUpdateCmd(nil))
+	cmd.AddCommand(newUpdatesCmd())
+	return cmd
+}
+
+func newUpdatesCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "updates",
+		Short: "Software update tracking",
+	}
+	cmd.AddCommand(newListUpdatesCmd(nil))
+	cmd.AddCommand(newGetUpdateCmd(nil))
 	cmd.AddCommand(newCheckUpdatesCmd(nil))
 	return cmd
 }
@@ -214,11 +223,11 @@ func newUtilizationCmd(client SystemClient) *cobra.Command {
 	return cmd
 }
 
-func newUpdatesCmd(client SystemClient) *cobra.Command {
+func newListUpdatesCmd(client SystemClient) *cobra.Command {
 	var status, updateType string
 
 	cmd := &cobra.Command{
-		Use:   "updates",
+		Use:   "list",
 		Short: "List tracked software updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client
@@ -285,9 +294,9 @@ func printUpdateList(w io.Writer, list gen.SystemUpdateList) error {
 	return output.Print(w, output.FormatTable, list, headers, rows)
 }
 
-func newUpdateCmd(client SystemClient) *cobra.Command {
+func newGetUpdateCmd(client SystemClient) *cobra.Command {
 	return &cobra.Command{
-		Use:   "update <update-id>",
+		Use:   "get <update-id>",
 		Short: "Show update details for a tracked component",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -359,7 +368,7 @@ func newUpdateCmd(client SystemClient) *cobra.Command {
 
 func newCheckUpdatesCmd(client SystemClient) *cobra.Command {
 	return &cobra.Command{
-		Use:   "check-updates",
+		Use:   "check",
 		Short: "Force check for upstream updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client
