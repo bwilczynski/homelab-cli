@@ -3,7 +3,7 @@ SPEC_FILE    := $(SPEC_REPO)/dist/openapi.bundled.yaml
 BINARY       := bin/hlctl
 OAPI_CODEGEN := go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
 
-.PHONY: help build generate bundle lint tidy
+.PHONY: help build generate bundle lint test tidy
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
@@ -23,6 +23,9 @@ bundle: ## Bundle the OpenAPI spec from the submodule
 
 lint: ## Run go vet
 	go vet ./...
+
+test: ## Run tests
+	go test ./...
 
 tidy: ## Tidy go.mod
 	go mod tidy
