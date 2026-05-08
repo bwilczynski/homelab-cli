@@ -28,6 +28,7 @@ checksum:
 
 brews:
   - name: hlctl
+    directory: Formula
     repository:
       owner: bwilczynski
       name: homebrew-tap
