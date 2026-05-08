@@ -10,12 +10,15 @@ func TestExecute_version(t *testing.T) {
 	buf := &bytes.Buffer{}
 	rootCmd.SetOut(buf)
 	rootCmd.SetArgs([]string{"--version"})
+	prevVersion := rootCmd.Version
 	t.Cleanup(func() {
 		rootCmd.SetArgs(nil)
-		rootCmd.Version = ""
+		rootCmd.Version = prevVersion
 	})
 
-	_ = Execute("v20260508.774a")
+	if err := Execute("v20260508.774a"); err != nil {
+		t.Fatalf("Execute returned unexpected error: %v", err)
+	}
 
 	if !strings.Contains(buf.String(), "v20260508.774a") {
 		t.Errorf("expected version in output, got: %s", buf.String())
