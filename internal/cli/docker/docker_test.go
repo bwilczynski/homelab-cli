@@ -158,3 +158,134 @@ func TestRestartContainerCmd(t *testing.T) {
 		t.Errorf("expected 'restarted' in output, got: %s", buf.String())
 	}
 }
+
+func TestListNetworksCmd_tableOutput(t *testing.T) {
+	stub := &StubClient{
+		ListDockerNetworksFunc: func(_ context.Context, _ *gen.ListDockerNetworksParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.DockerNetworkList{
+				Items: []gen.DockerNetwork{
+					{
+						Id:                  "nas-1.immich_default",
+						Name:                "immich_default",
+						Device:              "nas-1",
+						ConnectedContainers: 4,
+					},
+				},
+			}), nil
+		},
+	}
+
+	cmd := newListNetworksCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"nas-1.immich_default", "immich_default", "nas-1", "4"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestGetNetworkCmd_tableOutput(t *testing.T) {
+	stub := &StubClient{
+		GetDockerNetworkFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.DockerNetworkDetail{
+				Id:                  "nas-1.immich_default",
+				Name:                "immich_default",
+				Device:              "nas-1",
+				ConnectedContainers: 4,
+				Driver:              "bridge",
+				Subnet:              strPtr("172.18.0.0/16"),
+				Gateway:             strPtr("172.18.0.1"),
+				Containers:          []string{"immich_server", "immich_redis"},
+			}), nil
+		},
+	}
+
+	cmd := newGetNetworkCmd(stub)
+	cmd.SetArgs([]string{"nas-1.immich_default"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"nas-1.immich_default", "bridge", "172.18.0.0/16", "172.18.0.1", "immich_server", "immich_redis"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestListImagesCmd_tableOutput(t *testing.T) {
+	stub := &StubClient{
+		ListDockerImagesFunc: func(_ context.Context, _ *gen.ListDockerImagesParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.DockerImageList{
+				Items: []gen.DockerImage{
+					{
+						Id:         "nas-1.925ff61909ae",
+						Device:     "nas-1",
+						Repository: "ghcr.io/immich-app/immich-server",
+						Tags:       []string{"v1.120.0"},
+						Size:       524288000,
+					},
+				},
+			}), nil
+		},
+	}
+
+	cmd := newListImagesCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"nas-1.925ff61909ae", "ghcr.io/immich-app/immich-server", "v1.120.0"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestGetImageCmd_tableOutput(t *testing.T) {
+	stub := &StubClient{
+		GetDockerImageFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.DockerImageDetail{
+				Id:          "nas-1.925ff61909ae",
+				Device:      "nas-1",
+				Repository:  "ghcr.io/immich-app/immich-server",
+				Tags:        []string{"v1.120.0"},
+				Size:        524288000,
+				VirtualSize: 1073741824,
+			}), nil
+		},
+	}
+
+	cmd := newGetImageCmd(stub)
+	cmd.SetArgs([]string{"nas-1.925ff61909ae"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"nas-1.925ff61909ae", "ghcr.io/immich-app/immich-server", "v1.120.0", "500.0 MB", "1.0 GB"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func strPtr(s string) *string { return &s }
