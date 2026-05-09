@@ -59,12 +59,15 @@ make build
 
 Expected: exits 0.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Verify file is NOT tracked in git**
+
+`internal/docker/api.gen.go` is gitignored — do NOT commit it. Verify it is untracked:
 
 ```bash
-git add internal/docker/api.gen.go
-git commit -m "chore: regenerate docker API client with networks and images"
+git status internal/docker/api.gen.go
 ```
+
+Expected: file shows as untracked (or not listed at all). If git ls-files shows it tracked, run `git rm --cached internal/docker/api.gen.go`.
 
 ---
 
