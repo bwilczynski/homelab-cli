@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
@@ -21,15 +22,17 @@ func NewCmd() *cobra.Command {
 		Short: "Docker resources",
 	}
 	cmd.AddCommand(newContainersCmd())
+	cmd.AddCommand(newNetworksCmd())
+	cmd.AddCommand(newImagesCmd())
 	return cmd
 }
 
-func buildClient() (ContainersClient, error) {
+func buildClient() (DockerClient, error) {
 	httpClient, apiURL, err := apiclient.NewHTTPClient()
 	if err != nil {
 		return nil, err
 	}
-	return NewContainersClient(httpClient, apiURL)
+	return NewDockerClient(httpClient, apiURL)
 }
 
 func newContainersCmd() *cobra.Command {
@@ -45,7 +48,7 @@ func newContainersCmd() *cobra.Command {
 	return cmd
 }
 
-func newListCmd(client ContainersClient) *cobra.Command {
+func newListCmd(client DockerClient) *cobra.Command {
 	var device string
 
 	cmd := &cobra.Command{
@@ -108,7 +111,7 @@ func newListCmd(client ContainersClient) *cobra.Command {
 	return cmd
 }
 
-func newGetCmd(client ContainersClient) *cobra.Command {
+func newGetCmd(client DockerClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <container-id>",
 		Short: "Show container details",
@@ -266,7 +269,7 @@ func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
 	return nil
 }
 
-func newStartCmd(client ContainersClient) *cobra.Command {
+func newStartCmd(client DockerClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "start <container-id>",
 		Short: "Start a container",
@@ -294,7 +297,7 @@ func newStartCmd(client ContainersClient) *cobra.Command {
 	}
 }
 
-func newStopCmd(client ContainersClient) *cobra.Command {
+func newStopCmd(client DockerClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop <container-id>",
 		Short: "Stop a container",
@@ -322,7 +325,7 @@ func newStopCmd(client ContainersClient) *cobra.Command {
 	}
 }
 
-func newRestartCmd(client ContainersClient) *cobra.Command {
+func newRestartCmd(client DockerClient) *cobra.Command {
 	return &cobra.Command{
 		Use:   "restart <container-id>",
 		Short: "Restart a container",
@@ -348,4 +351,288 @@ func newRestartCmd(client ContainersClient) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newNetworksCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "networks",
+		Short: "Docker networks",
+	}
+	cmd.AddCommand(newListNetworksCmd(nil))
+	cmd.AddCommand(newGetNetworkCmd(nil))
+	return cmd
+}
+
+func newListNetworksCmd(client DockerClient) *cobra.Command {
+	var device string
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List Docker networks",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			params := &gen.ListDockerNetworksParams{}
+			if device != "" {
+				params.Device = &device
+			}
+
+			resp, err := c.ListDockerNetworks(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.DockerNetworkList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			headers := []string{"ID", "NAME", "DEVICE", "CONTAINERS"}
+			var rows [][]string
+			for _, n := range list.Items {
+				rows = append(rows, []string{
+					n.Id, n.Name, n.Device,
+					fmt.Sprintf("%d", n.ConnectedContainers),
+				})
+			}
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+		},
+	}
+
+	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
+	return cmd
+}
+
+func newGetNetworkCmd(client DockerClient) *cobra.Command {
+	return &cobra.Command{
+		Use:   "get <network-id>",
+		Short: "Show network details",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			resp, err := c.GetDockerNetwork(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var detail gen.DockerNetworkDetail
+			if err := json.Unmarshal(body, &detail); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			return printNetworkDetail(cmd, detail)
+		},
+	}
+}
+
+func printNetworkDetail(cmd *cobra.Command, d gen.DockerNetworkDetail) error {
+	w := cmd.OutOrStdout()
+
+	headers := []string{"FIELD", "VALUE"}
+	rows := [][]string{
+		{"ID", d.Id},
+		{"NAME", d.Name},
+		{"DEVICE", d.Device},
+		{"DRIVER", d.Driver},
+		{"CONTAINERS", fmt.Sprintf("%d", d.ConnectedContainers)},
+	}
+	// subnet and gateway are optional (no IPAM on host/macvlan networks)
+	if d.Subnet != nil {
+		rows = append(rows, []string{"SUBNET", *d.Subnet})
+	}
+	if d.Gateway != nil {
+		rows = append(rows, []string{"GATEWAY", *d.Gateway})
+	}
+	if err := output.Print(w, output.FormatTable, nil, headers, rows); err != nil {
+		return err
+	}
+
+	if len(d.Containers) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "CONNECTED CONTAINERS")
+		var rows [][]string
+		for _, name := range d.Containers {
+			rows = append(rows, []string{name})
+		}
+		if err := output.Print(w, output.FormatTable, nil, []string{"NAME"}, rows); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func newImagesCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "images",
+		Short: "Docker images",
+	}
+	cmd.AddCommand(newListImagesCmd(nil))
+	cmd.AddCommand(newGetImageCmd(nil))
+	return cmd
+}
+
+func newListImagesCmd(client DockerClient) *cobra.Command {
+	var device string
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List Docker images",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			params := &gen.ListDockerImagesParams{}
+			if device != "" {
+				params.Device = &device
+			}
+
+			resp, err := c.ListDockerImages(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var list gen.DockerImageList
+			if err := json.Unmarshal(body, &list); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			headers := []string{"ID", "DEVICE", "REPOSITORY", "TAGS", "SIZE"}
+			var rows [][]string
+			for _, img := range list.Items {
+				rows = append(rows, []string{
+					img.Id,
+					img.Device,
+					img.Repository,
+					strings.Join(img.Tags, ", "),
+					output.FormatBytes(img.Size),
+				})
+			}
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+		},
+	}
+
+	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
+	return cmd
+}
+
+func newGetImageCmd(client DockerClient) *cobra.Command {
+	return &cobra.Command{
+		Use:   "get <image-id>",
+		Short: "Show image details",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			resp, err := c.GetDockerImage(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var detail gen.DockerImageDetail
+			if err := json.Unmarshal(body, &detail); err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			return printImageDetail(cmd, detail)
+		},
+	}
+}
+
+func printImageDetail(cmd *cobra.Command, d gen.DockerImageDetail) error {
+	w := cmd.OutOrStdout()
+
+	headers := []string{"FIELD", "VALUE"}
+	rows := [][]string{
+		{"ID", d.Id},
+		{"DEVICE", d.Device},
+		{"REPOSITORY", d.Repository},
+		{"TAGS", strings.Join(d.Tags, ", ")},
+		{"SIZE", output.FormatBytes(d.Size)},
+		{"VIRTUAL SIZE", output.FormatBytes(d.VirtualSize)},
+	}
+	if !d.Created.IsZero() {
+		rows = append(rows, []string{"CREATED", output.FormatTime(d.Created)})
+	}
+	return output.Print(w, output.FormatTable, nil, headers, rows)
 }

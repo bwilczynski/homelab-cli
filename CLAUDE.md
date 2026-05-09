@@ -55,6 +55,10 @@ make build
 2. Add the generation line to the `Makefile` `generate` target
 3. Run `make generate`
 
+## Git
+
+- Never add `Co-Authored-By` trailers to commit messages.
+
 ## Conventions
 
 - Config location: `~/.config/homelab/`
