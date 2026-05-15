@@ -16,7 +16,7 @@ import (
 type StubClient struct {
 	ListNetworkDevicesFunc func(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetNetworkDeviceFunc   func(ctx context.Context, deviceId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	ListNetworkClientsFunc func(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListNetworkClientsFunc func(ctx context.Context, params *gen.ListNetworkClientsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetNetworkClientFunc   func(ctx context.Context, clientId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 }
 
@@ -28,8 +28,8 @@ func (s *StubClient) GetNetworkDevice(ctx context.Context, deviceId string, reqE
 	return s.GetNetworkDeviceFunc(ctx, deviceId, reqEditors...)
 }
 
-func (s *StubClient) ListNetworkClients(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
-	return s.ListNetworkClientsFunc(ctx, reqEditors...)
+func (s *StubClient) ListNetworkClients(ctx context.Context, params *gen.ListNetworkClientsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.ListNetworkClientsFunc(ctx, params, reqEditors...)
 }
 
 func (s *StubClient) GetNetworkClient(ctx context.Context, clientId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
