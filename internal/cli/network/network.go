@@ -287,28 +287,22 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 				if d.Ip != nil {
 					ip = *d.Ip
 				}
-				switchName := ""
-				if d.SwitchName != nil {
-					switchName = *d.SwitchName
-				}
-				switchPort := ""
-				if d.SwitchPort != nil {
-					switchPort = fmt.Sprintf("%d", *d.SwitchPort)
-				}
-				uptime := ""
-				if d.Uptime != nil {
-					uptime = output.FormatUptime(*d.Uptime)
-				}
 				rows = [][]string{
 					{"ID", d.Id},
 					{"NAME", d.Name},
 					{"MAC", d.Mac},
 					{"IP", ip},
-					{"STATUS", string(d.Status)},
 					{"CONNECTION", string(d.ConnectionType)},
-					{"SWITCH", switchName},
-					{"SWITCH PORT", switchPort},
-					{"UPTIME", uptime},
+					{"STATUS", string(d.Status)},
+				}
+				if d.SwitchName != nil {
+					rows = append(rows, []string{"SWITCH", *d.SwitchName})
+				}
+				if d.SwitchPort != nil {
+					rows = append(rows, []string{"SWITCH PORT", fmt.Sprintf("%d", *d.SwitchPort)})
+				}
+				if d.Uptime != nil {
+					rows = append(rows, []string{"UPTIME", output.FormatUptime(*d.Uptime)})
 				}
 			case "wireless":
 				d, err := detail.AsWirelessNetworkClientDetail()
@@ -319,28 +313,22 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 				if d.Ip != nil {
 					ip = *d.Ip
 				}
-				ssid := ""
-				if d.Ssid != nil {
-					ssid = *d.Ssid
-				}
-				signal := ""
-				if d.SignalStrength != nil {
-					signal = fmt.Sprintf("%d dBm", *d.SignalStrength)
-				}
-				uptime := ""
-				if d.Uptime != nil {
-					uptime = output.FormatUptime(*d.Uptime)
-				}
 				rows = [][]string{
 					{"ID", d.Id},
 					{"NAME", d.Name},
 					{"MAC", d.Mac},
 					{"IP", ip},
-					{"STATUS", string(d.Status)},
 					{"CONNECTION", string(d.ConnectionType)},
-					{"SSID", ssid},
-					{"SIGNAL", signal},
-					{"UPTIME", uptime},
+					{"STATUS", string(d.Status)},
+				}
+				if d.Ssid != nil {
+					rows = append(rows, []string{"SSID", *d.Ssid})
+				}
+				if d.SignalStrength != nil {
+					rows = append(rows, []string{"SIGNAL", fmt.Sprintf("%d dBm", *d.SignalStrength)})
+				}
+				if d.Uptime != nil {
+					rows = append(rows, []string{"UPTIME", output.FormatUptime(*d.Uptime)})
 				}
 			default:
 				return fmt.Errorf("unknown connection type: %s", disc)

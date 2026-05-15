@@ -159,6 +159,7 @@ func TestGetClientCmd_wired(t *testing.T) {
 				"mac":            "aa:bb:cc:dd:ee:01",
 				"ip":             "192.168.1.50",
 				"connectionType": "wired",
+				"status":         "online",
 				"switchName":     "switch-1",
 				"switchPort":     3,
 				"uptime":         3600,
@@ -176,7 +177,7 @@ func TestGetClientCmd_wired(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"laptop", "switch-1", fmt.Sprintf("%d", 3)} {
+	for _, want := range []string{"laptop", "switch-1", fmt.Sprintf("%d", 3), "online"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
@@ -223,6 +224,7 @@ func TestGetClientCmd_wireless(t *testing.T) {
 				"mac":            "aa:bb:cc:dd:ee:02",
 				"ip":             "192.168.1.51",
 				"connectionType": "wireless",
+				"status":         "online",
 				"ssid":           "HomeNet",
 				"signalStrength": -65,
 				"uptime":         1800,
@@ -240,13 +242,85 @@ func TestGetClientCmd_wireless(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"phone", "HomeNet", "-65 dBm"} {
+	for _, want := range []string{"phone", "HomeNet", "-65 dBm", "online"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "SWITCH") {
 		t.Errorf("expected no SWITCH row in wireless output, got:\n%s", out)
+	}
+}
+
+func TestGetClientCmd_offline_wired(t *testing.T) {
+	stub := &StubClient{
+		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id":             "unifi.aa:bb:cc:dd:ee:03",
+				"name":           "printer",
+				"mac":            "aa:bb:cc:dd:ee:03",
+				"ip":             "192.168.1.60",
+				"connectionType": "wired",
+				"status":         "offline",
+			}), nil
+		},
+	}
+
+	cmd := newGetClientCmd(stub)
+	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:03"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"printer", "offline"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	for _, absent := range []string{"SWITCH PORT", "UPTIME"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected %q to be absent for offline wired client, got:\n%s", absent, out)
+		}
+	}
+}
+
+func TestGetClientCmd_offline_wireless(t *testing.T) {
+	stub := &StubClient{
+		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id":             "unifi.aa:bb:cc:dd:ee:04",
+				"name":           "tablet",
+				"mac":            "aa:bb:cc:dd:ee:04",
+				"ip":             "192.168.1.70",
+				"connectionType": "wireless",
+				"status":         "offline",
+			}), nil
+		},
+	}
+
+	cmd := newGetClientCmd(stub)
+	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:04"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{"tablet", "offline"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	for _, absent := range []string{"SSID", "SIGNAL", "UPTIME"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected %q to be absent for offline wireless client, got:\n%s", absent, out)
+		}
 	}
 }
 
