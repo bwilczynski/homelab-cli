@@ -281,7 +281,7 @@ func TestGetClientCmd_offline_wired(t *testing.T) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
 	}
-	for _, absent := range []string{"SWITCH PORT", "UPTIME"} {
+	for _, absent := range []string{"SWITCH", "SWITCH PORT", "UPTIME"} {
 		if strings.Contains(out, absent) {
 			t.Errorf("expected %q to be absent for offline wired client, got:\n%s", absent, out)
 		}
