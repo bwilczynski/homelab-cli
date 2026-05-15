@@ -160,7 +160,7 @@ func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 func newClientsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clients",
-		Short: "Connected network clients",
+		Short: "Network clients",
 	}
 	cmd.AddCommand(newListClientsCmd(nil))
 	cmd.AddCommand(newGetClientCmd(nil))
@@ -168,9 +168,10 @@ func newClientsCmd() *cobra.Command {
 }
 
 func newListClientsCmd(client NetworkClient) *cobra.Command {
-	return &cobra.Command{
+	var statusFilter string
+	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List connected network clients",
+		Short: "List network clients",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := client
 			if c == nil {
@@ -181,7 +182,13 @@ func newListClientsCmd(client NetworkClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.ListNetworkClients(context.Background())
+			params := &gen.ListNetworkClientsParams{}
+			if statusFilter != "" {
+				s := gen.NetworkClientStatus(statusFilter)
+				params.Status = &s
+			}
+
+			resp, err := c.ListNetworkClients(context.Background(), params)
 			if err != nil {
 				return err
 			}
@@ -204,7 +211,7 @@ func newListClientsCmd(client NetworkClient) *cobra.Command {
 				return nil
 			}
 
-			headers := []string{"ID", "NAME", "MAC", "IP", "CONNECTION"}
+			headers := []string{"ID", "NAME", "MAC", "IP", "STATUS", "CONNECTION"}
 			var rows [][]string
 			for _, cl := range list.Items {
 				ip := ""
@@ -213,12 +220,15 @@ func newListClientsCmd(client NetworkClient) *cobra.Command {
 				}
 				rows = append(rows, []string{
 					cl.Id, cl.Name, cl.Mac, ip,
+					string(cl.Status),
 					string(cl.ConnectionType),
 				})
 			}
 			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
 		},
 	}
+	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
+	return cmd
 }
 
 func newGetClientCmd(client NetworkClient) *cobra.Command {
@@ -277,15 +287,28 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 				if d.Ip != nil {
 					ip = *d.Ip
 				}
+				switchName := ""
+				if d.SwitchName != nil {
+					switchName = *d.SwitchName
+				}
+				switchPort := ""
+				if d.SwitchPort != nil {
+					switchPort = fmt.Sprintf("%d", *d.SwitchPort)
+				}
+				uptime := ""
+				if d.Uptime != nil {
+					uptime = output.FormatUptime(*d.Uptime)
+				}
 				rows = [][]string{
 					{"ID", d.Id},
 					{"NAME", d.Name},
 					{"MAC", d.Mac},
 					{"IP", ip},
+					{"STATUS", string(d.Status)},
 					{"CONNECTION", string(d.ConnectionType)},
-					{"SWITCH", d.SwitchName},
-					{"SWITCH PORT", fmt.Sprintf("%d", d.SwitchPort)},
-					{"UPTIME", output.FormatUptime(d.Uptime)},
+					{"SWITCH", switchName},
+					{"SWITCH PORT", switchPort},
+					{"UPTIME", uptime},
 				}
 			case "wireless":
 				d, err := detail.AsWirelessNetworkClientDetail()
@@ -296,15 +319,28 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 				if d.Ip != nil {
 					ip = *d.Ip
 				}
+				ssid := ""
+				if d.Ssid != nil {
+					ssid = *d.Ssid
+				}
+				signal := ""
+				if d.SignalStrength != nil {
+					signal = fmt.Sprintf("%d dBm", *d.SignalStrength)
+				}
+				uptime := ""
+				if d.Uptime != nil {
+					uptime = output.FormatUptime(*d.Uptime)
+				}
 				rows = [][]string{
 					{"ID", d.Id},
 					{"NAME", d.Name},
 					{"MAC", d.Mac},
 					{"IP", ip},
+					{"STATUS", string(d.Status)},
 					{"CONNECTION", string(d.ConnectionType)},
-					{"SSID", d.Ssid},
-					{"SIGNAL", fmt.Sprintf("%d dBm", d.SignalStrength)},
-					{"UPTIME", output.FormatUptime(d.Uptime)},
+					{"SSID", ssid},
+					{"SIGNAL", signal},
+					{"UPTIME", uptime},
 				}
 			default:
 				return fmt.Errorf("unknown connection type: %s", disc)

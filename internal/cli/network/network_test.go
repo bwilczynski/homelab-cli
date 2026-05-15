@@ -118,7 +118,7 @@ func TestGetDeviceCmd_tableOutput(t *testing.T) {
 func TestListClientsCmd_tableOutput(t *testing.T) {
 	ip := "192.168.1.50"
 	stub := &StubClient{
-		ListNetworkClientsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+		ListNetworkClientsFunc: func(_ context.Context, _ *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
 			return jsonResponse(http.StatusOK, gen.NetworkClientList{
 				Items: []gen.NetworkClient{
 					{
@@ -127,6 +127,7 @@ func TestListClientsCmd_tableOutput(t *testing.T) {
 						Mac:            "aa:bb:cc:dd:ee:01",
 						Ip:             &ip,
 						ConnectionType: gen.NetworkClientConnectionTypeWired,
+						Status:         gen.Online,
 					},
 				},
 			}), nil
@@ -142,7 +143,7 @@ func TestListClientsCmd_tableOutput(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"unifi.aa:bb:cc:dd:ee:01", "laptop", "192.168.1.50", "wired"} {
+	for _, want := range []string{"unifi.aa:bb:cc:dd:ee:01", "laptop", "192.168.1.50", "wired", "online"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
@@ -251,7 +252,7 @@ func TestGetClientCmd_wireless(t *testing.T) {
 
 func TestListClientsCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListNetworkClientsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+		ListNetworkClientsFunc: func(_ context.Context, _ *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
 			return jsonResponse(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
@@ -270,6 +271,32 @@ func TestListClientsCmd_apiError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Unauthorized") {
 		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
+	}
+}
+
+func TestListClientsCmd_statusFilter(t *testing.T) {
+	var capturedParams *gen.ListNetworkClientsParams
+	stub := &StubClient{
+		ListNetworkClientsFunc: func(_ context.Context, params *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			capturedParams = params
+			return jsonResponse(http.StatusOK, gen.NetworkClientList{Items: []gen.NetworkClient{}}), nil
+		},
+	}
+
+	cmd := newListClientsCmd(stub)
+	cmd.SetArgs([]string{"--status", "online"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if capturedParams == nil || capturedParams.Status == nil {
+		t.Fatal("expected Status param to be set")
+	}
+	if *capturedParams.Status != gen.Online {
+		t.Errorf("expected status=online, got %q", *capturedParams.Status)
 	}
 }
 
