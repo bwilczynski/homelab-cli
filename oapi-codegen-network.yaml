@@ -6,3 +6,5 @@ output: internal/network/api.gen.go
 output-options:
   include-tags:
     - network
+compatibility:
+  always-prefix-enum-values: true
