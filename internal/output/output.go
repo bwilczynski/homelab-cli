@@ -56,34 +56,30 @@ func printTable(w io.Writer, headers []string, rows [][]string) error {
 	return tw.Flush()
 }
 
-// FormatBytes converts a byte count to a human-readable string using binary units.
-func FormatBytes(n int64) string {
+// formatBinaryUnits is a private helper that formats byte counts using binary units.
+// baseUnit is "B" and suffix is either "" or "/s" to create the full unit names.
+func formatBinaryUnits(n int64, baseUnit, suffix string) string {
 	const unit = 1024
 	if n < unit {
-		return fmt.Sprintf("%d B", n)
+		return fmt.Sprintf("%d %s%s", n, baseUnit, suffix)
 	}
 	div, exp := int64(unit), 0
 	for n := n / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++
 	}
-	units := []string{"KB", "MB", "GB", "TB", "PB"}
-	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
+	units := []string{"K", "M", "G", "T", "P"}
+	return fmt.Sprintf("%.1f %s%s%s", float64(n)/float64(div), units[exp], baseUnit, suffix)
+}
+
+// FormatBytes converts a byte count to a human-readable string using binary units.
+func FormatBytes(n int64) string {
+	return formatBinaryUnits(n, "B", "")
 }
 
 // FormatBytesPerSec converts a byte count per second to a human-readable string using binary units.
 func FormatBytesPerSec(n int64) string {
-	const unit = 1024
-	if n < unit {
-		return fmt.Sprintf("%d B/s", n)
-	}
-	div, exp := int64(unit), 0
-	for n := n / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	units := []string{"KB/s", "MB/s", "GB/s", "TB/s", "PB/s"}
-	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
+	return formatBinaryUnits(n, "B", "/s")
 }
 
 // FormatLinkSpeed converts network speed abbreviations to their full representation.
