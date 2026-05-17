@@ -12,27 +12,27 @@ import (
 )
 
 func TestListDevicesCmd_tableOutput(t *testing.T) {
-	numClients := 5
 	stub := &StubClient{
 		ListNetworkDevicesFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
 			return jsonResponse(http.StatusOK, gen.NetworkDeviceList{
 				Items: []gen.NetworkDevice{
 					{
 						Id:     "unifi.usg",
+						Uri:    "/network/devices/unifi.usg",
 						Name:   "USG",
 						Mac:    "aa:bb:cc:dd:00:01",
 						Ip:     "192.168.1.1",
-						Type:   gen.Gateway,
-						Status: gen.Connected,
+						Type:   gen.NetworkDeviceTypeGateway,
+						Status: gen.NetworkDeviceStatusConnected,
 					},
 					{
-						Id:         "unifi.ap-living-room",
-						Name:       "AP Living Room",
-						Mac:        "aa:bb:cc:dd:00:03",
-						Ip:         "192.168.1.3",
-						Type:       gen.AccessPoint,
-						Status:     gen.Connected,
-						NumClients: &numClients,
+						Id:     "unifi.ap-living-room",
+						Uri:    "/network/devices/unifi.ap-living-room",
+						Name:   "AP Living Room",
+						Mac:    "aa:bb:cc:dd:00:03",
+						Ip:     "192.168.1.3",
+						Type:   gen.NetworkDeviceTypeAccessPoint,
+						Status: gen.NetworkDeviceStatusConnected,
 					},
 				},
 			}), nil
@@ -48,10 +48,13 @@ func TestListDevicesCmd_tableOutput(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"unifi.usg", "unifi.ap-living-room", "gateway", "accessPoint", "5"} {
+	for _, want := range []string{"unifi.usg", "unifi.ap-living-room", "gateway", "accessPoint"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "CLIENTS") {
+		t.Errorf("expected no CLIENTS column in list output, got:\n%s", out)
 	}
 }
 
@@ -80,17 +83,15 @@ func TestListDevicesCmd_apiError(t *testing.T) {
 }
 
 func TestGetDeviceCmd_tableOutput(t *testing.T) {
-	numClients := 3
 	stub := &StubClient{
 		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.NetworkDeviceDetail{
+			return jsonResponse(http.StatusOK, gen.GatewayDetail{
 				Id:              "unifi.usg",
 				Name:            "USG",
 				Mac:             "aa:bb:cc:dd:00:01",
 				Ip:              "192.168.1.1",
-				Type:            gen.Gateway,
-				Status:          gen.Connected,
-				NumClients:      &numClients,
+				Type:            gen.GatewayDetailTypeGateway,
+				Status:          gen.NetworkDeviceStatusConnected,
 				Model:           "USG-3P",
 				FirmwareVersion: "4.4.57",
 				Uptime:          86400,
@@ -127,7 +128,7 @@ func TestListClientsCmd_tableOutput(t *testing.T) {
 						Mac:            "aa:bb:cc:dd:ee:01",
 						Ip:             &ip,
 						ConnectionType: gen.NetworkClientConnectionTypeWired,
-						Status:         gen.Online,
+						Status:         gen.NetworkClientStatusOnline,
 					},
 				},
 			}), nil
@@ -153,6 +154,7 @@ func TestListClientsCmd_tableOutput(t *testing.T) {
 func TestGetClientCmd_wired(t *testing.T) {
 	stub := &StubClient{
 		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			port := 3
 			return jsonResponse(http.StatusOK, map[string]any{
 				"id":             "unifi.aa:bb:cc:dd:ee:01",
 				"name":           "laptop",
@@ -160,9 +162,17 @@ func TestGetClientCmd_wired(t *testing.T) {
 				"ip":             "192.168.1.50",
 				"connectionType": "wired",
 				"status":         "online",
-				"switchName":     "switch-1",
-				"switchPort":     3,
-				"uptime":         3600,
+				"connectedTo": map[string]any{
+					"device": map[string]any{
+						"id":   "unifi.switch-1",
+						"kind": "device",
+						"name": "switch-1",
+						"uri":  "/network/devices/unifi.switch-1",
+					},
+					"port":      &port,
+					"linkSpeed": "gbe1",
+				},
+				"uptime": 3600,
 			}), nil
 		},
 	}
@@ -187,13 +197,13 @@ func TestGetClientCmd_wired(t *testing.T) {
 func TestGetDeviceCmd_noClientsRow(t *testing.T) {
 	stub := &StubClient{
 		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.NetworkDeviceDetail{
+			return jsonResponse(http.StatusOK, gen.GatewayDetail{
 				Id:              "unifi.usg",
 				Name:            "USG",
 				Mac:             "aa:bb:cc:dd:00:01",
 				Ip:              "192.168.1.1",
-				Type:            gen.Gateway,
-				Status:          gen.Connected,
+				Type:            gen.GatewayDetailTypeGateway,
+				Status:          gen.NetworkDeviceStatusConnected,
 				Model:           "USG-3P",
 				FirmwareVersion: "4.4.57",
 				Uptime:          86400,
@@ -211,13 +221,14 @@ func TestGetDeviceCmd_noClientsRow(t *testing.T) {
 	}
 
 	if strings.Contains(buf.String(), "CLIENTS") {
-		t.Errorf("expected no CLIENTS row when NumClients is nil, got:\n%s", buf.String())
+		t.Errorf("expected no CLIENTS row for gateway device, got:\n%s", buf.String())
 	}
 }
 
 func TestGetClientCmd_wireless(t *testing.T) {
 	stub := &StubClient{
 		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			signalStrength := -65
 			return jsonResponse(http.StatusOK, map[string]any{
 				"id":             "unifi.aa:bb:cc:dd:ee:02",
 				"name":           "phone",
@@ -225,9 +236,17 @@ func TestGetClientCmd_wireless(t *testing.T) {
 				"ip":             "192.168.1.51",
 				"connectionType": "wireless",
 				"status":         "online",
-				"ssid":           "HomeNet",
-				"signalStrength": -65,
-				"uptime":         1800,
+				"connectedTo": map[string]any{
+					"device": map[string]any{
+						"id":   "unifi.ap-living-room",
+						"kind": "device",
+						"name": "AP Living Room",
+						"uri":  "/network/devices/unifi.ap-living-room",
+					},
+					"ssid":           "HomeNet",
+					"signalStrength": &signalStrength,
+				},
+				"uptime": 1800,
 			}), nil
 		},
 	}
@@ -262,6 +281,14 @@ func TestGetClientCmd_offline_wired(t *testing.T) {
 				"ip":             "192.168.1.60",
 				"connectionType": "wired",
 				"status":         "offline",
+				"connectedTo": map[string]any{
+					"device": map[string]any{
+						"id":   "unifi.switch-1",
+						"kind": "device",
+						"name": "switch-1",
+						"uri":  "/network/devices/unifi.switch-1",
+					},
+				},
 			}), nil
 		},
 	}
@@ -281,7 +308,7 @@ func TestGetClientCmd_offline_wired(t *testing.T) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
 	}
-	for _, absent := range []string{"SWITCH", "SWITCH PORT", "UPTIME"} {
+	for _, absent := range []string{"SWITCH PORT", "UPTIME"} {
 		if strings.Contains(out, absent) {
 			t.Errorf("expected %q to be absent for offline wired client, got:\n%s", absent, out)
 		}
@@ -298,6 +325,15 @@ func TestGetClientCmd_offline_wireless(t *testing.T) {
 				"ip":             "192.168.1.70",
 				"connectionType": "wireless",
 				"status":         "offline",
+				"connectedTo": map[string]any{
+					"device": map[string]any{
+						"id":   "unifi.ap-living-room",
+						"kind": "device",
+						"name": "AP Living Room",
+						"uri":  "/network/devices/unifi.ap-living-room",
+					},
+					"ssid": "HomeNet",
+				},
 			}), nil
 		},
 	}
@@ -317,7 +353,7 @@ func TestGetClientCmd_offline_wireless(t *testing.T) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
 	}
-	for _, absent := range []string{"SSID", "SIGNAL", "UPTIME"} {
+	for _, absent := range []string{"SIGNAL", "UPTIME"} {
 		if strings.Contains(out, absent) {
 			t.Errorf("expected %q to be absent for offline wireless client, got:\n%s", absent, out)
 		}
@@ -369,7 +405,7 @@ func TestListClientsCmd_statusFilter(t *testing.T) {
 	if capturedParams == nil || capturedParams.Status == nil {
 		t.Fatal("expected Status param to be set")
 	}
-	if *capturedParams.Status != gen.Online {
+	if *capturedParams.Status != gen.NetworkClientStatusOnline {
 		t.Errorf("expected status=online, got %q", *capturedParams.Status)
 	}
 }
