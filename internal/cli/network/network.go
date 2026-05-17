@@ -184,7 +184,7 @@ func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 						continue
 					}
 					speed := "-"
-					if p.LinkSpeed != nil {
+					if p.State == gen.NetworkPortStateUp && p.LinkSpeed != nil {
 						speed = output.FormatLinkSpeed(string(*p.LinkSpeed))
 					}
 					poePower := "-"
@@ -193,13 +193,22 @@ func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 					}
 					connectedTo := "-"
 					if p.ConnectedTo != nil {
-						kind, _ := p.ConnectedTo.Discriminator()
+						kind, err := p.ConnectedTo.Discriminator()
+						if err != nil {
+							return err
+						}
 						switch kind {
 						case "device":
-							ref, _ := p.ConnectedTo.AsNetworkDeviceRef()
+							ref, err := p.ConnectedTo.AsNetworkDeviceRef()
+							if err != nil {
+								return err
+							}
 							connectedTo = ref.Name
 						case "client":
-							ref, _ := p.ConnectedTo.AsNetworkClientRef()
+							ref, err := p.ConnectedTo.AsNetworkClientRef()
+							if err != nil {
+								return err
+							}
 							connectedTo = ref.Name
 						}
 					}

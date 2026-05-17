@@ -308,7 +308,6 @@ func TestGetDeviceCmd_accessPoint(t *testing.T) {
 				"name": "AP Living Room", "mac": "aa:bb:cc:dd:00:03", "ip": "192.168.1.3",
 				"type": "accessPoint", "status": "connected",
 				"model": "U6-Lite", "firmwareVersion": "6.6.77", "uptime": 7200,
-				"numClients": 2,
 				"traffic": map[string]any{
 					"rxBytesTotal": int64(1073741824), "txBytesTotal": int64(536870912),
 					"rxBytesPerSec": int64(50000), "txBytesPerSec": int64(25000),
