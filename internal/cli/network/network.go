@@ -399,12 +399,13 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 					{"IP", ip},
 					{"CONNECTION", string(d.ConnectionType)},
 					{"STATUS", string(d.Status)},
-				}
-				if d.ConnectedTo.Device.Name != "" {
-					rows = append(rows, []string{"SWITCH", d.ConnectedTo.Device.Name})
+					{"SWITCH", d.ConnectedTo.Device.Name},
 				}
 				if d.ConnectedTo.Port != nil {
-					rows = append(rows, []string{"SWITCH PORT", fmt.Sprintf("%d", *d.ConnectedTo.Port)})
+					rows = append(rows, []string{"PORT", fmt.Sprintf("%d", *d.ConnectedTo.Port)})
+				}
+				if d.ConnectedTo.LinkSpeed != nil {
+					rows = append(rows, []string{"LINK SPEED", output.FormatLinkSpeed(string(*d.ConnectedTo.LinkSpeed))})
 				}
 				if d.Uptime != nil {
 					rows = append(rows, []string{"UPTIME", output.FormatUptime(*d.Uptime)})
@@ -425,9 +426,8 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 					{"IP", ip},
 					{"CONNECTION", string(d.ConnectionType)},
 					{"STATUS", string(d.Status)},
-				}
-				if d.ConnectedTo.Ssid != "" {
-					rows = append(rows, []string{"SSID", d.ConnectedTo.Ssid})
+					{"AP", d.ConnectedTo.Device.Name},
+					{"SSID", d.ConnectedTo.Ssid},
 				}
 				if d.ConnectedTo.SignalStrength != nil {
 					rows = append(rows, []string{"SIGNAL", fmt.Sprintf("%d dBm", *d.ConnectedTo.SignalStrength)})
