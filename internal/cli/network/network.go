@@ -79,17 +79,12 @@ func newListDevicesCmd(client NetworkClient) *cobra.Command {
 				return nil
 			}
 
-			headers := []string{"ID", "NAME", "MAC", "IP", "TYPE", "STATUS", "CLIENTS"}
+			headers := []string{"ID", "NAME", "MAC", "IP", "TYPE", "STATUS"}
 			var rows [][]string
 			for _, d := range list.Items {
-				clients := ""
-				if d.NumClients != nil {
-					clients = fmt.Sprintf("%d", *d.NumClients)
-				}
 				rows = append(rows, []string{
 					d.Id, d.Name, d.Mac, d.Ip,
 					string(d.Type), string(d.Status),
-					clients,
 				})
 			}
 			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
@@ -97,8 +92,37 @@ func newListDevicesCmd(client NetworkClient) *cobra.Command {
 	}
 }
 
+func deviceBaseRows(id, name, mac, ip, typ, status, model, firmware string, uptime int, traffic gen.NetworkTraffic, uplink *gen.NetworkConnection) [][]string {
+	rows := [][]string{
+		{"ID", id},
+		{"NAME", name},
+		{"MAC", mac},
+		{"IP", ip},
+		{"TYPE", typ},
+		{"STATUS", status},
+		{"MODEL", model},
+		{"FIRMWARE", firmware},
+		{"UPTIME", output.FormatUptime(uptime)},
+		{"TRAFFIC RX", fmt.Sprintf("%s (%s total)", output.FormatBytesPerSec(traffic.RxBytesPerSec), output.FormatBytes(traffic.RxBytesTotal))},
+		{"TRAFFIC TX", fmt.Sprintf("%s (%s total)", output.FormatBytesPerSec(traffic.TxBytesPerSec), output.FormatBytes(traffic.TxBytesTotal))},
+	}
+	if uplink != nil {
+		uplinkStr := uplink.Device.Name
+		if uplink.Port != nil {
+			uplinkStr += fmt.Sprintf(" (port %d", *uplink.Port)
+			if uplink.LinkSpeed != nil {
+				uplinkStr += fmt.Sprintf(", %s", output.FormatLinkSpeed(string(*uplink.LinkSpeed)))
+			}
+			uplinkStr += ")"
+		}
+		rows = append(rows, []string{"UPLINK", uplinkStr})
+	}
+	return rows
+}
+
 func newGetDeviceCmd(client NetworkClient) *cobra.Command {
-	return &cobra.Command{
+	var allPorts bool
+	cmd := &cobra.Command{
 		Use:   "get <device-id>",
 		Short: "Show network device details",
 		Args:  cobra.ExactArgs(1),
@@ -135,26 +159,116 @@ func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 				return nil
 			}
 
-			headers := []string{"FIELD", "VALUE"}
-			rows := [][]string{
-				{"ID", detail.Id},
-				{"NAME", detail.Name},
-				{"MAC", detail.Mac},
-				{"IP", detail.Ip},
-				{"TYPE", string(detail.Type)},
-				{"STATUS", string(detail.Status)},
+			disc, err := detail.Discriminator()
+			if err != nil {
+				return err
 			}
-			if detail.NumClients != nil {
-				rows = append(rows, []string{"CLIENTS", fmt.Sprintf("%d", *detail.NumClients)})
+
+			baseHeaders := []string{"FIELD", "VALUE"}
+
+			switch disc {
+			case "switch":
+				d, err := detail.AsSwitchDetail()
+				if err != nil {
+					return err
+				}
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				if err := output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "\n--- PORTS ---\n")
+				portHeaders := []string{"PORT", "STATE", "SPEED", "POE", "POE WATTS", "RX", "TX", "CONNECTED TO"}
+				var portRows [][]string
+				for _, p := range d.Ports {
+					if !allPorts && p.State != gen.NetworkPortStateUp {
+						continue
+					}
+					speed := "-"
+					if p.State == gen.NetworkPortStateUp && p.LinkSpeed != nil {
+						speed = output.FormatLinkSpeed(string(*p.LinkSpeed))
+					}
+					poePower := "-"
+					if p.PoePowerWatts != nil {
+						poePower = fmt.Sprintf("%.1f W", *p.PoePowerWatts)
+					}
+					connectedTo := "-"
+					if p.ConnectedTo != nil {
+						kind, err := p.ConnectedTo.Discriminator()
+						if err != nil {
+							return err
+						}
+						switch kind {
+						case "device":
+							ref, err := p.ConnectedTo.AsNetworkDeviceRef()
+							if err != nil {
+								return err
+							}
+							connectedTo = ref.Name
+						case "client":
+							ref, err := p.ConnectedTo.AsNetworkClientRef()
+							if err != nil {
+								return err
+							}
+							connectedTo = ref.Name
+						}
+					}
+					portRows = append(portRows, []string{
+						fmt.Sprintf("%d", p.Number),
+						string(p.State),
+						speed,
+						string(p.PoeMode),
+						poePower,
+						output.FormatBytesPerSec(p.Traffic.RxBytesPerSec),
+						output.FormatBytesPerSec(p.Traffic.TxBytesPerSec),
+						connectedTo,
+					})
+				}
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, portHeaders, portRows)
+
+			case "accessPoint":
+				d, err := detail.AsAccessPointDetail()
+				if err != nil {
+					return err
+				}
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				if err := output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "\n--- CLIENTS ---\n")
+				clientHeaders := []string{"CLIENT", "SSID", "SIGNAL"}
+				var clientRows [][]string
+				for _, cl := range d.ConnectedClients {
+					clientRows = append(clientRows, []string{
+						cl.Client.Name,
+						cl.Ssid,
+						fmt.Sprintf("%d dBm", cl.SignalStrength),
+					})
+				}
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, clientHeaders, clientRows)
+
+			case "gateway":
+				d, err := detail.AsGatewayDetail()
+				if err != nil {
+					return err
+				}
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows)
+
+			case "unknown":
+				d, err := detail.AsUnknownDeviceDetail()
+				if err != nil {
+					return err
+				}
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows)
+
+			default:
+				return fmt.Errorf("unknown device type: %s", disc)
 			}
-			rows = append(rows,
-				[]string{"MODEL", detail.Model},
-				[]string{"FIRMWARE", detail.FirmwareVersion},
-				[]string{"UPTIME", output.FormatUptime(detail.Uptime)},
-			)
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
 		},
 	}
+	cmd.Flags().BoolVar(&allPorts, "all-ports", false, "Show all ports (default: active ports only)")
+	return cmd
 }
 
 func newClientsCmd() *cobra.Command {
@@ -294,12 +408,13 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 					{"IP", ip},
 					{"CONNECTION", string(d.ConnectionType)},
 					{"STATUS", string(d.Status)},
+					{"SWITCH", d.ConnectedTo.Device.Name},
 				}
-				if d.SwitchName != nil {
-					rows = append(rows, []string{"SWITCH", *d.SwitchName})
+				if d.ConnectedTo.Port != nil {
+					rows = append(rows, []string{"PORT", fmt.Sprintf("%d", *d.ConnectedTo.Port)})
 				}
-				if d.SwitchPort != nil {
-					rows = append(rows, []string{"SWITCH PORT", fmt.Sprintf("%d", *d.SwitchPort)})
+				if d.ConnectedTo.LinkSpeed != nil {
+					rows = append(rows, []string{"LINK SPEED", output.FormatLinkSpeed(string(*d.ConnectedTo.LinkSpeed))})
 				}
 				if d.Uptime != nil {
 					rows = append(rows, []string{"UPTIME", output.FormatUptime(*d.Uptime)})
@@ -320,12 +435,11 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 					{"IP", ip},
 					{"CONNECTION", string(d.ConnectionType)},
 					{"STATUS", string(d.Status)},
+					{"AP", d.ConnectedTo.Device.Name},
+					{"SSID", d.ConnectedTo.Ssid},
 				}
-				if d.Ssid != nil {
-					rows = append(rows, []string{"SSID", *d.Ssid})
-				}
-				if d.SignalStrength != nil {
-					rows = append(rows, []string{"SIGNAL", fmt.Sprintf("%d dBm", *d.SignalStrength)})
+				if d.ConnectedTo.SignalStrength != nil {
+					rows = append(rows, []string{"SIGNAL", fmt.Sprintf("%d dBm", *d.ConnectedTo.SignalStrength)})
 				}
 				if d.Uptime != nil {
 					rows = append(rows, []string{"UPTIME", output.FormatUptime(*d.Uptime)})
