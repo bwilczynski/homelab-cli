@@ -37,16 +37,24 @@ export HOMELAB_TOKEN=your-token-here
 
 ```sh
 # List containers
-hlctl containers list
-hlctl containers list --device nas-1
+hlctl docker containers list
+hlctl docker containers list --device nas-1
 
 # Container details
-hlctl containers get nas-1.homeassistant
+hlctl docker containers get nas-1.homeassistant
 
 # Container lifecycle
-hlctl containers start nas-1.homeassistant
-hlctl containers stop nas-1.homeassistant
-hlctl containers restart nas-1.homeassistant
+hlctl docker containers start nas-1.homeassistant
+hlctl docker containers stop nas-1.homeassistant
+hlctl docker containers restart nas-1.homeassistant
+
+# Docker networks
+hlctl docker networks list
+hlctl docker networks get <network-id>
+
+# Docker images
+hlctl docker images list
+hlctl docker images get <image-id>
 
 # System health
 hlctl system health
@@ -54,25 +62,27 @@ hlctl system info
 hlctl system utilization
 
 # Storage
-hlctl storage volumes
-
-# Backups
-hlctl backups tasks
+hlctl storage volumes list
+hlctl storage backups list
 
 # Network
-hlctl network devices
-hlctl network clients
+hlctl network devices list
+hlctl network clients list
+hlctl network clients list --status offline
 
 # JSON output
-hlctl containers list -o json
+hlctl docker containers list -o json
 ```
 
 ## Domains
 
 | Domain | Commands |
 |--------|----------|
-| `containers` | list, get, start, stop, restart |
+| `docker containers` | list, get, start, stop, restart |
+| `docker networks` | list, get |
+| `docker images` | list, get |
 | `system` | health, info, utilization, updates, update, check-updates |
-| `storage` | volumes, volume |
-| `backups` | tasks, task |
-| `network` | devices, device, clients, client |
+| `storage volumes` | list, get |
+| `storage backups` | list, get |
+| `network devices` | list, get |
+| `network clients` | list, get |
