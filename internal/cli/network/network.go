@@ -92,8 +92,37 @@ func newListDevicesCmd(client NetworkClient) *cobra.Command {
 	}
 }
 
+func deviceBaseRows(id, name, mac, ip, typ, status, model, firmware string, uptime int, traffic gen.NetworkTraffic, uplink *gen.NetworkConnection) [][]string {
+	rows := [][]string{
+		{"ID", id},
+		{"NAME", name},
+		{"MAC", mac},
+		{"IP", ip},
+		{"TYPE", typ},
+		{"STATUS", status},
+		{"MODEL", model},
+		{"FIRMWARE", firmware},
+		{"UPTIME", output.FormatUptime(uptime)},
+		{"TRAFFIC RX", fmt.Sprintf("%s (%s total)", output.FormatBytesPerSec(traffic.RxBytesPerSec), output.FormatBytes(traffic.RxBytesTotal))},
+		{"TRAFFIC TX", fmt.Sprintf("%s (%s total)", output.FormatBytesPerSec(traffic.TxBytesPerSec), output.FormatBytes(traffic.TxBytesTotal))},
+	}
+	if uplink != nil {
+		uplinkStr := uplink.Device.Name
+		if uplink.Port != nil {
+			uplinkStr += fmt.Sprintf(" (port %d", *uplink.Port)
+			if uplink.LinkSpeed != nil {
+				uplinkStr += fmt.Sprintf(", %s", output.FormatLinkSpeed(string(*uplink.LinkSpeed)))
+			}
+			uplinkStr += ")"
+		}
+		rows = append(rows, []string{"UPLINK", uplinkStr})
+	}
+	return rows
+}
+
 func newGetDeviceCmd(client NetworkClient) *cobra.Command {
-	return &cobra.Command{
+	var allPorts bool
+	cmd := &cobra.Command{
 		Use:   "get <device-id>",
 		Short: "Show network device details",
 		Args:  cobra.ExactArgs(1),
@@ -135,82 +164,102 @@ func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 				return err
 			}
 
-			headers := []string{"FIELD", "VALUE"}
-			var rows [][]string
+			baseHeaders := []string{"FIELD", "VALUE"}
 
 			switch disc {
-			case "accessPoint":
-				d, err := detail.AsAccessPointDetail()
-				if err != nil {
-					return err
-				}
-				rows = [][]string{
-					{"ID", d.Id},
-					{"NAME", d.Name},
-					{"MAC", d.Mac},
-					{"IP", d.Ip},
-					{"TYPE", string(d.Type)},
-					{"STATUS", string(d.Status)},
-					{"CLIENTS", fmt.Sprintf("%d", d.NumClients)},
-					{"MODEL", d.Model},
-					{"FIRMWARE", d.FirmwareVersion},
-					{"UPTIME", output.FormatUptime(d.Uptime)},
-				}
-			case "gateway":
-				d, err := detail.AsGatewayDetail()
-				if err != nil {
-					return err
-				}
-				rows = [][]string{
-					{"ID", d.Id},
-					{"NAME", d.Name},
-					{"MAC", d.Mac},
-					{"IP", d.Ip},
-					{"TYPE", string(d.Type)},
-					{"STATUS", string(d.Status)},
-					{"MODEL", d.Model},
-					{"FIRMWARE", d.FirmwareVersion},
-					{"UPTIME", output.FormatUptime(d.Uptime)},
-				}
 			case "switch":
 				d, err := detail.AsSwitchDetail()
 				if err != nil {
 					return err
 				}
-				rows = [][]string{
-					{"ID", d.Id},
-					{"NAME", d.Name},
-					{"MAC", d.Mac},
-					{"IP", d.Ip},
-					{"TYPE", string(d.Type)},
-					{"STATUS", string(d.Status)},
-					{"MODEL", d.Model},
-					{"FIRMWARE", d.FirmwareVersion},
-					{"UPTIME", output.FormatUptime(d.Uptime)},
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				if err := output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows); err != nil {
+					return err
 				}
+				fmt.Fprintf(cmd.OutOrStdout(), "\n--- PORTS ---\n")
+				portHeaders := []string{"PORT", "STATE", "SPEED", "POE", "POE WATTS", "RX", "TX", "CONNECTED TO"}
+				var portRows [][]string
+				for _, p := range d.Ports {
+					if !allPorts && p.State != gen.NetworkPortStateUp {
+						continue
+					}
+					speed := "-"
+					if p.LinkSpeed != nil {
+						speed = output.FormatLinkSpeed(string(*p.LinkSpeed))
+					}
+					poePower := "-"
+					if p.PoePowerWatts != nil {
+						poePower = fmt.Sprintf("%.1f W", *p.PoePowerWatts)
+					}
+					connectedTo := "-"
+					if p.ConnectedTo != nil {
+						kind, _ := p.ConnectedTo.Discriminator()
+						switch kind {
+						case "device":
+							ref, _ := p.ConnectedTo.AsNetworkDeviceRef()
+							connectedTo = ref.Name
+						case "client":
+							ref, _ := p.ConnectedTo.AsNetworkClientRef()
+							connectedTo = ref.Name
+						}
+					}
+					portRows = append(portRows, []string{
+						fmt.Sprintf("%d", p.Number),
+						string(p.State),
+						speed,
+						string(p.PoeMode),
+						poePower,
+						output.FormatBytesPerSec(p.Traffic.RxBytesPerSec),
+						output.FormatBytesPerSec(p.Traffic.TxBytesPerSec),
+						connectedTo,
+					})
+				}
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, portHeaders, portRows)
+
+			case "accessPoint":
+				d, err := detail.AsAccessPointDetail()
+				if err != nil {
+					return err
+				}
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				if err := output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "\n--- CLIENTS ---\n")
+				clientHeaders := []string{"CLIENT", "SSID", "SIGNAL"}
+				var clientRows [][]string
+				for _, cl := range d.ConnectedClients {
+					clientRows = append(clientRows, []string{
+						cl.Client.Name,
+						cl.Ssid,
+						fmt.Sprintf("%d dBm", cl.SignalStrength),
+					})
+				}
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, clientHeaders, clientRows)
+
+			case "gateway":
+				d, err := detail.AsGatewayDetail()
+				if err != nil {
+					return err
+				}
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows)
+
 			case "unknown":
 				d, err := detail.AsUnknownDeviceDetail()
 				if err != nil {
 					return err
 				}
-				rows = [][]string{
-					{"ID", d.Id},
-					{"NAME", d.Name},
-					{"MAC", d.Mac},
-					{"IP", d.Ip},
-					{"TYPE", string(d.Type)},
-					{"STATUS", string(d.Status)},
-					{"MODEL", d.Model},
-					{"FIRMWARE", d.FirmwareVersion},
-					{"UPTIME", output.FormatUptime(d.Uptime)},
-				}
+				rows := deviceBaseRows(d.Id, d.Name, d.Mac, d.Ip, string(d.Type), string(d.Status), d.Model, d.FirmwareVersion, d.Uptime, d.Traffic, d.Uplink)
+				return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, baseHeaders, rows)
+
 			default:
 				return fmt.Errorf("unknown device type: %s", disc)
 			}
-
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
 		},
 	}
+	cmd.Flags().BoolVar(&allPorts, "all-ports", false, "Show all ports (default: active ports only)")
+	return cmd
 }
 
 func newClientsCmd() *cobra.Command {

@@ -82,23 +82,21 @@ func TestListDevicesCmd_apiError(t *testing.T) {
 	}
 }
 
-func TestGetDeviceCmd_tableOutput(t *testing.T) {
+func TestGetDeviceCmd_gateway(t *testing.T) {
 	stub := &StubClient{
 		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.GatewayDetail{
-				Id:              "unifi.usg",
-				Name:            "USG",
-				Mac:             "aa:bb:cc:dd:00:01",
-				Ip:              "192.168.1.1",
-				Type:            gen.GatewayDetailTypeGateway,
-				Status:          gen.NetworkDeviceStatusConnected,
-				Model:           "USG-3P",
-				FirmwareVersion: "4.4.57",
-				Uptime:          86400,
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.usg", "uri": "/network/devices/unifi.usg",
+				"name": "USG", "mac": "aa:bb:cc:dd:00:01", "ip": "192.168.1.1",
+				"type": "gateway", "status": "connected",
+				"model": "USG-3P", "firmwareVersion": "4.4.57", "uptime": 86400,
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(12884901888), "txBytesTotal": int64(4294967296),
+					"rxBytesPerSec": int64(125000), "txBytesPerSec": int64(50000),
+				},
 			}), nil
 		},
 	}
-
 	cmd := newGetDeviceCmd(stub)
 	cmd.SetArgs([]string{"unifi.usg"})
 	buf := &bytes.Buffer{}
@@ -107,11 +105,15 @@ func TestGetDeviceCmd_tableOutput(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	out := buf.String()
-	for _, want := range []string{"unifi.usg", "USG-3P", "4.4.57", "gateway"} {
+	for _, want := range []string{"unifi.usg", "USG-3P", "4.4.57", "gateway", "TRAFFIC RX", "TRAFFIC TX", "1d"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	for _, absent := range []string{"PORTS", "CLIENTS", "UPLINK"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected %q absent for gateway, got:\n%s", absent, out)
 		}
 	}
 }
@@ -194,34 +196,156 @@ func TestGetClientCmd_wired(t *testing.T) {
 	}
 }
 
-func TestGetDeviceCmd_noClientsRow(t *testing.T) {
+func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 	stub := &StubClient{
 		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.GatewayDetail{
-				Id:              "unifi.usg",
-				Name:            "USG",
-				Mac:             "aa:bb:cc:dd:00:01",
-				Ip:              "192.168.1.1",
-				Type:            gen.GatewayDetailTypeGateway,
-				Status:          gen.NetworkDeviceStatusConnected,
-				Model:           "USG-3P",
-				FirmwareVersion: "4.4.57",
-				Uptime:          86400,
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.mystery", "uri": "/network/devices/unifi.mystery",
+				"name": "Mystery Device", "mac": "aa:bb:cc:dd:00:ff", "ip": "192.168.1.99",
+				"type": "unknown", "status": "connected",
+				"model": "unknown-model", "firmwareVersion": "0.0.0", "uptime": 3600,
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(0), "txBytesTotal": int64(0),
+					"rxBytesPerSec": int64(0), "txBytesPerSec": int64(0),
+				},
+				"uplink": map[string]any{
+					"device": map[string]any{"kind": "device", "id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr", "name": "Switch Living Room"},
+					"port": 8, "linkSpeed": "gbe1",
+				},
 			}), nil
 		},
 	}
-
 	cmd := newGetDeviceCmd(stub)
-	cmd.SetArgs([]string{"unifi.usg"})
+	cmd.SetArgs([]string{"unifi.mystery"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	out := buf.String()
+	for _, want := range []string{"Mystery Device", "UPLINK", "Switch Living Room", "port 8", "1GbE"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
 
-	if strings.Contains(buf.String(), "CLIENTS") {
-		t.Errorf("expected no CLIENTS row for gateway device, got:\n%s", buf.String())
+func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
+	stub := &StubClient{
+		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr",
+				"name": "Switch Living Room", "mac": "aa:bb:cc:dd:00:10", "ip": "192.168.1.10",
+				"type": "switch", "status": "connected",
+				"model": "USW-24-PoE", "firmwareVersion": "6.2.14", "uptime": 86400,
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(12884901888), "txBytesTotal": int64(4294967296),
+					"rxBytesPerSec": int64(125000), "txBytesPerSec": int64(50000),
+				},
+				"ports": []map[string]any{
+					{
+						"number": 1, "state": "up", "linkSpeed": "gbe1", "poeMode": "auto",
+						"poePowerWatts": 8.5,
+						"traffic": map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(1200), "txBytesPerSec": int64(500)},
+						"connectedTo": map[string]any{"kind": "device", "id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room", "name": "AP Living Room"},
+					},
+					{
+						"number": 2, "state": "down", "poeMode": "off",
+						"traffic": map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(0), "txBytesPerSec": int64(0)},
+					},
+				},
+			}), nil
+		},
+	}
+	cmd := newGetDeviceCmd(stub)
+	cmd.SetArgs([]string{"unifi.switch-lr"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Switch Living Room", "PORTS", "AP Living Room", "1GbE", "8.5 W", "TRAFFIC RX", "TRAFFIC TX"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "down") {
+		t.Errorf("expected down port hidden by default, got:\n%s", out)
+	}
+}
+
+func TestGetDeviceCmd_switch_allPorts(t *testing.T) {
+	stub := &StubClient{
+		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr",
+				"name": "Switch Living Room", "mac": "aa:bb:cc:dd:00:10", "ip": "192.168.1.10",
+				"type": "switch", "status": "connected",
+				"model": "USW-24-PoE", "firmwareVersion": "6.2.14", "uptime": 3600,
+				"traffic": map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(0), "txBytesPerSec": int64(0)},
+				"ports": []map[string]any{
+					{"number": 1, "state": "up", "poeMode": "off", "traffic": map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(0), "txBytesPerSec": int64(0)}},
+					{"number": 2, "state": "down", "poeMode": "off", "traffic": map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(0), "txBytesPerSec": int64(0)}},
+					{"number": 3, "state": "disabled", "poeMode": "off", "traffic": map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(0), "txBytesPerSec": int64(0)}},
+				},
+			}), nil
+		},
+	}
+	cmd := newGetDeviceCmd(stub)
+	cmd.SetArgs([]string{"unifi.switch-lr", "--all-ports"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"down", "disabled"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output with --all-ports, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestGetDeviceCmd_accessPoint(t *testing.T) {
+	stub := &StubClient{
+		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room",
+				"name": "AP Living Room", "mac": "aa:bb:cc:dd:00:03", "ip": "192.168.1.3",
+				"type": "accessPoint", "status": "connected",
+				"model": "U6-Lite", "firmwareVersion": "6.6.77", "uptime": 7200,
+				"numClients": 2,
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(1073741824), "txBytesTotal": int64(536870912),
+					"rxBytesPerSec": int64(50000), "txBytesPerSec": int64(25000),
+				},
+				"connectedClients": []map[string]any{
+					{"client": map[string]any{"kind": "client", "id": "unifi.macbook-pro", "uri": "/network/clients/unifi.macbook-pro", "name": "MacBook Pro"}, "ssid": "HomeNetwork", "signalStrength": -62},
+					{"client": map[string]any{"kind": "client", "id": "unifi.iphone-15", "uri": "/network/clients/unifi.iphone-15", "name": "iPhone 15"}, "ssid": "HomeNetwork", "signalStrength": -70},
+				},
+			}), nil
+		},
+	}
+	cmd := newGetDeviceCmd(stub)
+	cmd.SetArgs([]string{"unifi.ap-living-room"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"AP Living Room", "CLIENTS", "MacBook Pro", "iPhone 15", "HomeNetwork", "-62 dBm", "-70 dBm", "TRAFFIC RX"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "PORTS") {
+		t.Errorf("expected no PORTS section for AP, got:\n%s", out)
 	}
 }
 
