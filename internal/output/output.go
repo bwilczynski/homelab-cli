@@ -71,6 +71,41 @@ func FormatBytes(n int64) string {
 	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
 }
 
+// FormatBytesPerSec converts a byte count per second to a human-readable string using binary units.
+func FormatBytesPerSec(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B/s", n)
+	}
+	div, exp := int64(unit), 0
+	for n := n / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	units := []string{"KB/s", "MB/s", "GB/s", "TB/s", "PB/s"}
+	return fmt.Sprintf("%.1f %s", float64(n)/float64(div), units[exp])
+}
+
+// FormatLinkSpeed converts network speed abbreviations to their full representation.
+func FormatLinkSpeed(s string) string {
+	switch s {
+	case "e":
+		return "10M"
+	case "fe":
+		return "100M"
+	case "gbe1":
+		return "1GbE"
+	case "gbe2_5":
+		return "2.5GbE"
+	case "gbe5":
+		return "5GbE"
+	case "gbe10":
+		return "10GbE"
+	default:
+		return s
+	}
+}
+
 // FormatTime formats a time value in the local timezone using RFC3339 layout,
 // which includes the UTC offset (e.g. "2026-04-30T05:00:00+02:00").
 func FormatTime(t time.Time) string {

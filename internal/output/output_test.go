@@ -51,3 +51,48 @@ func TestFormatUptime(t *testing.T) {
 		}
 	}
 }
+
+func TestFormatBytesPerSec(t *testing.T) {
+	tests := []struct {
+		input    int64
+		expected string
+	}{
+		{0, "0 B/s"},
+		{500, "500 B/s"},
+		{1024, "1.0 KB/s"},
+		{125000, "122.1 KB/s"},
+		{1048576, "1.0 MB/s"},
+		{1073741824, "1.0 GB/s"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			got := output.FormatBytesPerSec(tt.input)
+			if got != tt.expected {
+				t.Errorf("FormatBytesPerSec(%d) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFormatLinkSpeed(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"e", "10M"},
+		{"fe", "100M"},
+		{"gbe1", "1GbE"},
+		{"gbe2_5", "2.5GbE"},
+		{"gbe5", "5GbE"},
+		{"gbe10", "10GbE"},
+		{"unknown", "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := output.FormatLinkSpeed(tt.input)
+			if got != tt.expected {
+				t.Errorf("FormatLinkSpeed(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
