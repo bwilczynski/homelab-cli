@@ -452,3 +452,221 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 		},
 	}
 }
+
+type childEntry struct {
+	nodeID   string
+	nodeDisp string
+	edgeDisp string
+}
+
+func newTopologyCmd(client NetworkClient) *cobra.Command {
+	var includeClients bool
+	var includeWireless bool
+
+	cmd := &cobra.Command{
+		Use:   "topology",
+		Short: "Show network topology",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c := client
+			if c == nil {
+				var err error
+				c, err = buildClient()
+				if err != nil {
+					return err
+				}
+			}
+
+			params := &gen.GetNetworkTopologyParams{}
+			if includeClients || includeWireless {
+				t := true
+				params.IncludeClients = &t
+			}
+
+			resp, err := c.GetNetworkTopology(context.Background(), params)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return apiclient.ParseError(resp)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				return nil
+			}
+
+			var topo gen.NetworkTopology
+			if err := json.Unmarshal(body, &topo); err != nil {
+				return err
+			}
+
+			return printTopologyTree(cmd.OutOrStdout(), topo, includeWireless)
+		},
+	}
+
+	cmd.Flags().BoolVar(&includeClients, "include-clients", false, "Include wired clients in the topology")
+	cmd.Flags().BoolVar(&includeWireless, "include-wireless", false, "Also include wireless clients (implies --include-clients)")
+	return cmd
+}
+
+// formatTopologyLinkSpeed formats link speed with a space before the unit (e.g. "1 GbE").
+func formatTopologyLinkSpeed(s string) string {
+	switch s {
+	case "e":
+		return "10M"
+	case "fe":
+		return "100M"
+	case "gbe1":
+		return "1 GbE"
+	case "gbe2_5":
+		return "2.5 GbE"
+	case "gbe5":
+		return "5 GbE"
+	case "gbe10":
+		return "10 GbE"
+	default:
+		return s
+	}
+}
+
+func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bool) error {
+	// Build node display strings keyed by node ID.
+	nodeDisp := make(map[string]string)
+	var gatewayID string
+	for _, n := range topo.Nodes {
+		disc, err := n.Discriminator()
+		if err != nil {
+			return err
+		}
+		switch disc {
+		case "device":
+			d, err := n.AsTopologyDeviceNode()
+			if err != nil {
+				return err
+			}
+			disp := fmt.Sprintf("%s (%s)", d.Name, string(d.Type))
+			if d.NumClients != nil && *d.NumClients > 0 {
+				disp += fmt.Sprintf(" [%d clients]", *d.NumClients)
+			}
+			nodeDisp[d.Id] = disp
+			if d.Type == gen.NetworkDeviceTypeGateway {
+				gatewayID = d.Id
+			}
+		case "client":
+			cl, err := n.AsTopologyClientNode()
+			if err != nil {
+				return err
+			}
+			nodeDisp[cl.Id] = fmt.Sprintf("%s (client, %s)", cl.Name, string(cl.ConnectionType))
+		}
+	}
+
+	if gatewayID == "" {
+		return fmt.Errorf("no gateway node found in topology")
+	}
+
+	// Build adjacency map: parent node ID → []childEntry.
+	adjacency := make(map[string][]childEntry)
+	for _, e := range topo.Edges {
+		disc, err := e.Discriminator()
+		if err != nil {
+			return err
+		}
+		switch disc {
+		case "wired":
+			we, err := e.AsTopologyWiredEdge()
+			if err != nil {
+				return err
+			}
+			srcID, err := connectionRefID(we.Source)
+			if err != nil {
+				return err
+			}
+			edgeDisp := ""
+			if we.Port != nil && we.LinkSpeed != nil {
+				edgeDisp = fmt.Sprintf("[port %d, %s]", *we.Port, formatTopologyLinkSpeed(string(*we.LinkSpeed)))
+			} else if we.Port != nil {
+				edgeDisp = fmt.Sprintf("[port %d]", *we.Port)
+			}
+			adjacency[we.Target.Id] = append(adjacency[we.Target.Id], childEntry{
+				nodeID:   srcID,
+				nodeDisp: nodeDisp[srcID],
+				edgeDisp: edgeDisp,
+			})
+		case "wireless":
+			if !includeWireless {
+				continue
+			}
+			wire, err := e.AsTopologyWirelessEdge()
+			if err != nil {
+				return err
+			}
+			edgeDisp := fmt.Sprintf("(%s)", wire.Ssid)
+			if wire.SignalStrength != nil {
+				edgeDisp = fmt.Sprintf("(%s, %d dBm)", wire.Ssid, *wire.SignalStrength)
+			}
+			adjacency[wire.Target.Id] = append(adjacency[wire.Target.Id], childEntry{
+				nodeID:   wire.Source.Id,
+				nodeDisp: nodeDisp[wire.Source.Id],
+				edgeDisp: edgeDisp,
+			})
+		}
+	}
+
+	// Print the tree rooted at the gateway.
+	fmt.Fprintln(w, nodeDisp[gatewayID])
+	children := adjacency[gatewayID]
+	for i, child := range children {
+		printTopologyNode(w, child, adjacency, "", i == len(children)-1)
+	}
+	return nil
+}
+
+func connectionRefID(ref gen.NetworkConnectionRef) (string, error) {
+	disc, err := ref.Discriminator()
+	if err != nil {
+		return "", err
+	}
+	switch disc {
+	case "device":
+		r, err := ref.AsNetworkDeviceRef()
+		if err != nil {
+			return "", err
+		}
+		return r.Id, nil
+	case "client":
+		r, err := ref.AsNetworkClientRef()
+		if err != nil {
+			return "", err
+		}
+		return r.Id, nil
+	default:
+		return "", fmt.Errorf("unknown connection ref kind: %s", disc)
+	}
+}
+
+func printTopologyNode(w io.Writer, entry childEntry, adjacency map[string][]childEntry, prefix string, isLast bool) {
+	connector := "├── "
+	childPrefix := "│   "
+	if isLast {
+		connector = "└── "
+		childPrefix = "    "
+	}
+
+	line := entry.nodeDisp
+	if entry.edgeDisp != "" {
+		line += " " + entry.edgeDisp
+	}
+	fmt.Fprintln(w, prefix+connector+line)
+
+	children := adjacency[entry.nodeID]
+	for i, child := range children {
+		printTopologyNode(w, child, adjacency, prefix+childPrefix, i == len(children)-1)
+	}
+}
