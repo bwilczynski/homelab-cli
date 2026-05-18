@@ -515,25 +515,6 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 	return cmd
 }
 
-// formatTopologyLinkSpeed formats link speed with a space before the unit (e.g. "1 GbE").
-func formatTopologyLinkSpeed(s string) string {
-	switch s {
-	case "e":
-		return "10M"
-	case "fe":
-		return "100M"
-	case "gbe1":
-		return "1 GbE"
-	case "gbe2_5":
-		return "2.5 GbE"
-	case "gbe5":
-		return "5 GbE"
-	case "gbe10":
-		return "10 GbE"
-	default:
-		return s
-	}
-}
 
 func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bool) error {
 	// Build node display strings keyed by node ID.
@@ -590,7 +571,7 @@ func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bo
 			}
 			edgeDisp := ""
 			if we.Port != nil && we.LinkSpeed != nil {
-				edgeDisp = fmt.Sprintf("[port %d, %s]", *we.Port, formatTopologyLinkSpeed(string(*we.LinkSpeed)))
+				edgeDisp = fmt.Sprintf("[port %d, %s]", *we.Port, output.FormatLinkSpeed(string(*we.LinkSpeed)))
 			} else if we.Port != nil {
 				edgeDisp = fmt.Sprintf("[port %d]", *we.Port)
 			}

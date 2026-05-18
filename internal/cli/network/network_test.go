@@ -177,7 +177,7 @@ func TestGetClientCmd_wired(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"laptop", "Switch Living Room", "3", "1GbE", "online"} {
+	for _, want := range []string{"laptop", "Switch Living Room", "3", "1 GbE", "online"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
@@ -215,7 +215,7 @@ func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"Mystery Device", "UPLINK", "Switch Living Room", "port 8", "1GbE"} {
+	for _, want := range []string{"Mystery Device", "UPLINK", "Switch Living Room", "port 8", "1 GbE"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
@@ -258,7 +258,7 @@ func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"Switch Living Room", "PORTS", "AP Living Room", "1GbE", "8.5 W", "TRAFFIC RX", "TRAFFIC TX"} {
+	for _, want := range []string{"Switch Living Room", "PORTS", "AP Living Room", "1 GbE", "8.5 W", "TRAFFIC RX", "TRAFFIC TX"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}

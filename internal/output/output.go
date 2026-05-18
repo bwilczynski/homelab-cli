@@ -86,17 +86,17 @@ func FormatBytesPerSec(n int64) string {
 func FormatLinkSpeed(s string) string {
 	switch s {
 	case "e":
-		return "10M"
+		return "10 Mbps"
 	case "fe":
-		return "100M"
+		return "100 Mbps"
 	case "gbe1":
-		return "1GbE"
+		return "1 GbE"
 	case "gbe2_5":
-		return "2.5GbE"
+		return "2.5 GbE"
 	case "gbe5":
-		return "5GbE"
+		return "5 GbE"
 	case "gbe10":
-		return "10GbE"
+		return "10 GbE"
 	default:
 		return s
 	}

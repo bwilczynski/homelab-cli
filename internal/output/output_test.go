@@ -79,12 +79,12 @@ func TestFormatLinkSpeed(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"e", "10M"},
-		{"fe", "100M"},
-		{"gbe1", "1GbE"},
-		{"gbe2_5", "2.5GbE"},
-		{"gbe5", "5GbE"},
-		{"gbe10", "10GbE"},
+		{"e", "10 Mbps"},
+		{"fe", "100 Mbps"},
+		{"gbe1", "1 GbE"},
+		{"gbe2_5", "2.5 GbE"},
+		{"gbe5", "5 GbE"},
+		{"gbe10", "10 GbE"},
 		{"unknown", "unknown"},
 	}
 	for _, tt := range tests {
