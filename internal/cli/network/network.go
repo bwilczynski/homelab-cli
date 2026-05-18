@@ -588,9 +588,9 @@ func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bo
 			if err != nil {
 				return err
 			}
-			edgeDisp := fmt.Sprintf("(%s)", wire.Ssid)
+			edgeDisp := fmt.Sprintf("[%s]", wire.Ssid)
 			if wire.SignalStrength != nil {
-				edgeDisp = fmt.Sprintf("(%s, %d dBm)", wire.Ssid, *wire.SignalStrength)
+				edgeDisp = fmt.Sprintf("[%s, %d dBm]", wire.Ssid, *wire.SignalStrength)
 			}
 			adjacency[wire.Target.Id] = append(adjacency[wire.Target.Id], childEntry{
 				nodeID:   wire.Source.Id,
