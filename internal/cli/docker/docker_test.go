@@ -200,8 +200,8 @@ func TestGetNetworkCmd_tableOutput(t *testing.T) {
 				Device:              "nas-1",
 				ConnectedContainers: 4,
 				Driver:              "bridge",
-				Subnet:              strPtr("172.18.0.0/16"),
-				Gateway:             strPtr("172.18.0.1"),
+				Subnet:              new("172.18.0.0/16"),
+				Gateway:             new("172.18.0.1"),
 				Containers:          []string{"immich_server", "immich_redis"},
 			}), nil
 		},
@@ -287,5 +287,3 @@ func TestGetImageCmd_tableOutput(t *testing.T) {
 		}
 	}
 }
-
-func strPtr(s string) *string { return &s }
