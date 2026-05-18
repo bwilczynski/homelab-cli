@@ -518,6 +518,13 @@ func TestGetClientCmd_notFound(t *testing.T) {
 }
 
 func TestTopologyCmd_devicesOnly(t *testing.T) {
+	// Topology:
+	//   USG (gateway)
+	//   ├── Switch LR (switch) [port 1, 1 GbE]
+	//   │   └── AP-Office (accessPoint) [port 3, 1 GbE]
+	//   └── AP LR (accessPoint) [port 2, 1 GbE] [2 clients]
+	//
+	// USG has two direct children → exercises ├──, └──, and │ (continuation bar).
 	stub := &StubClient{
 		GetNetworkTopologyFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
 			if params.IncludeClients != nil {
@@ -527,6 +534,7 @@ func TestTopologyCmd_devicesOnly(t *testing.T) {
 				"nodes": []any{
 					map[string]any{"kind": "device", "id": "unifi.usg", "uri": "/network/devices/unifi.usg", "name": "USG", "type": "gateway", "status": "connected"},
 					map[string]any{"kind": "device", "id": "unifi.sw", "uri": "/network/devices/unifi.sw", "name": "Switch LR", "type": "switch", "status": "connected"},
+					map[string]any{"kind": "device", "id": "unifi.apoffice", "uri": "/network/devices/unifi.apoffice", "name": "AP-Office", "type": "accessPoint", "status": "connected"},
 					map[string]any{"kind": "device", "id": "unifi.ap", "uri": "/network/devices/unifi.ap", "name": "AP LR", "type": "accessPoint", "status": "connected", "numClients": 2},
 				},
 				"edges": []any{
@@ -539,10 +547,17 @@ func TestTopologyCmd_devicesOnly(t *testing.T) {
 					},
 					map[string]any{
 						"kind":      "wired",
-						"source":    map[string]any{"kind": "device", "id": "unifi.ap", "uri": "/network/devices/unifi.ap", "name": "AP LR"},
+						"source":    map[string]any{"kind": "device", "id": "unifi.apoffice", "uri": "/network/devices/unifi.apoffice", "name": "AP-Office"},
 						"target":    map[string]any{"kind": "device", "id": "unifi.sw", "uri": "/network/devices/unifi.sw", "name": "Switch LR"},
-						"port":      7,
-						"linkSpeed": "gbe2_5",
+						"port":      3,
+						"linkSpeed": "gbe1",
+					},
+					map[string]any{
+						"kind":      "wired",
+						"source":    map[string]any{"kind": "device", "id": "unifi.ap", "uri": "/network/devices/unifi.ap", "name": "AP LR"},
+						"target":    map[string]any{"kind": "device", "id": "unifi.usg", "uri": "/network/devices/unifi.usg", "name": "USG"},
+						"port":      2,
+						"linkSpeed": "gbe1",
 					},
 				},
 			}), nil
@@ -558,7 +573,13 @@ func TestTopologyCmd_devicesOnly(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"USG", "gateway", "Switch LR", "switch", "AP LR", "accessPoint", "├──", "└──", "port 1", "1 GbE", "port 7", "2.5 GbE", "[2 clients]"} {
+	for _, want := range []string{
+		"USG", "gateway",
+		"Switch LR", "switch", "port 1", "1 GbE",
+		"AP-Office", "accessPoint", "port 3",
+		"AP LR", "port 2", "[2 clients]",
+		"├──", "└──", "│",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
