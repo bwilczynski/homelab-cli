@@ -63,6 +63,40 @@ PORT  STATE  SPEED    POE   POE WATTS  RX         TX         CONNECTED TO
 
 Useful when an AP is suddenly drawing 14W instead of the usual 8, or you want to know why that camera in the garage negotiated 100 Mbps on a cable that should do gigabit.
 
+## Patch Tuesday, every day
+
+Every container on every host, its installed version, the latest upstream. When a CVE drops, you don't have to SSH into three boxes to find out if you're exposed.
+
+```sh
+$ hlctl system updates list --status updateAvailable
+ID                   NAME            DEVICE  TYPE       STATUS           CURRENT   LATEST
+nas-1.vaultwarden    Vaultwarden     nas-1   container  updateAvailable  1.32.7    1.34.0
+nas-1.homeassistant  Home Assistant  nas-1   container  updateAvailable  2026.4.2  2026.5.1
+nas-1.paperless-ngx  Paperless-ngx   nas-1   container  updateAvailable  2.13.5    2.14.0
+nas-2.gitea          Gitea           nas-2   container  updateAvailable  1.22.6    1.23.0
+```
+
+Drop the filter to see the up-to-date stuff too, or drill in when a version bump catches your eye:
+
+```sh
+$ hlctl system updates get nas-1.vaultwarden
+FIELD         VALUE
+ID            nas-1.vaultwarden
+NAME          Vaultwarden
+DEVICE        nas-1
+TYPE          container
+STATUS        updateAvailable
+CURRENT       1.32.7
+LATEST        1.34.0
+CHECKED AT    2026-05-18T08:30:00+02:00
+PUBLISHED AT  2026-04-25T16:00:00+02:00
+IMAGE         vaultwarden/server:1.32.7
+SOURCE        https://github.com/dani-garcia/vaultwarden
+RELEASE URL   https://github.com/dani-garcia/vaultwarden/releases/tag/1.34.0
+```
+
+One click on the release URL tells you whether it's a security patch worth a maintenance window tonight or just feature noise that can wait for the weekend.
+
 ## Domains
 
 | Domain | What's in it |
