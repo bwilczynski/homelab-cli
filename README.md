@@ -97,7 +97,9 @@ RELEASE URL   https://github.com/dani-garcia/vaultwarden/releases/tag/1.34.0
 
 One click on the release URL tells you whether it's a security patch worth a maintenance window tonight or just feature noise that can wait for the weekend.
 
-## Domains
+## There's more to explore
+
+`hlctl` covers the full homelab stack. Here's what's available:
 
 | Domain | What's in it |
 |--------|----------------|
