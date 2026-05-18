@@ -21,6 +21,7 @@ func NewCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newDevicesCmd())
 	cmd.AddCommand(newClientsCmd())
+	cmd.AddCommand(newTopologyCmd(nil))
 	return cmd
 }
 
