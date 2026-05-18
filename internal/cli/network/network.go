@@ -516,7 +516,6 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 	return cmd
 }
 
-
 func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bool) error {
 	// Build node display strings keyed by node ID.
 	nodeDisp := make(map[string]string)
