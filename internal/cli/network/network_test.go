@@ -644,7 +644,7 @@ func TestTopologyCmd_includeClientsWiredOnly(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"nas-1", "port 8", "1 GbE"} {
+	for _, want := range []string{"nas-1", "online", "port 8", "1 GbE"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
@@ -698,7 +698,7 @@ func TestTopologyCmd_includeWireless(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, want := range []string{"MacBook Pro", "HomeNet", "-55 dBm"} {
+	for _, want := range []string{"MacBook Pro", "online", "HomeNet", "-55 dBm"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}

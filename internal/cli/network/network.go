@@ -544,7 +544,7 @@ func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bo
 			if err != nil {
 				return err
 			}
-			nodeDisp[cl.Id] = fmt.Sprintf("%s (client, %s)", cl.Name, string(cl.ConnectionType))
+			nodeDisp[cl.Id] = fmt.Sprintf("%s (client, %s, %s)", cl.Name, string(cl.ConnectionType), string(cl.Status))
 		}
 	}
 
