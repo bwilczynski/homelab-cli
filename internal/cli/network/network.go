@@ -22,6 +22,7 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(newDevicesCmd())
 	cmd.AddCommand(newClientsCmd())
 	cmd.AddCommand(newTopologyCmd(nil))
+	cmd.AddCommand(newVlansCmd())
 	return cmd
 }
 
