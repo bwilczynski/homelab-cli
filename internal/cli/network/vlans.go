@@ -131,7 +131,7 @@ func newGetVlanCmd(client NetworkClient) *cobra.Command {
 				rows = append(rows, []string{"RELAY", *detail.RelayServer})
 			}
 			rows = append(rows, []string{"DNS", strings.Join(detail.DnsServers, ", ")})
-			return output.Print(cmd.OutOrStdout(), output.FormatTable, nil, headers, rows)
+			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), nil, headers, rows)
 		},
 	}
 }

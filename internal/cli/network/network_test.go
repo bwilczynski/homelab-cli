@@ -891,3 +891,36 @@ func TestGetVlanCmd_notFound(t *testing.T) {
 		t.Errorf("expected 'Not Found' in error, got: %v", err)
 	}
 }
+
+func TestGetVlanCmd_disabledDhcp(t *testing.T) {
+	stub := &StubClient{
+		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.servers", "uri": "/network/vlans/unifi.servers",
+				"name": "Servers", "vlanId": 10, "subnet": "192.168.10.0/24",
+				"gatewayIp": "192.168.10.1", "broadcastIp": "192.168.10.255",
+				"dhcpMode": "disabled",
+				"dnsServers": []string{"1.1.1.1"},
+			}), nil
+		},
+	}
+	cmd := newGetVlanCmd(stub)
+	cmd.SetArgs([]string{"unifi.servers"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Servers", "disabled", "1.1.1.1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	for _, absent := range []string{"DHCP RANGE", "RELAY"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected %q absent for disabled DHCP, got:\n%s", absent, out)
+		}
+	}
+}
