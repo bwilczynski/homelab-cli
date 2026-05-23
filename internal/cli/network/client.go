@@ -15,6 +15,12 @@ type NetworkClient interface {
 	ListNetworkClients(ctx context.Context, params *gen.ListNetworkClientsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetNetworkClient(ctx context.Context, clientId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetNetworkTopology(ctx context.Context, params *gen.GetNetworkTopologyParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListVlans(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetVlan(ctx context.Context, vlanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListSsids(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetSsid(ctx context.Context, ssidId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListWans(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetWan(ctx context.Context, wanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 }
 
 // NewNetworkClient constructs a NetworkClient backed by the real API.

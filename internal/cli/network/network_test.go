@@ -757,3 +757,382 @@ func TestTopologyCmd_apiError(t *testing.T) {
 		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
 	}
 }
+
+func TestListVlansCmd_tableOutput(t *testing.T) {
+	stub := &StubClient{
+		ListVlansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.VlanList{
+				Items: []gen.Vlan{
+					{Id: "unifi.default", Name: "Default", VlanId: 1, Subnet: "192.168.1.0/24"},
+					{Id: "unifi.iot", Name: "IoT", VlanId: 20, Subnet: "192.168.20.0/24"},
+				},
+			}), nil
+		},
+	}
+	cmd := newListVlansCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"unifi.default", "Default", "192.168.1.0/24", "unifi.iot", "IoT", "20"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestListVlansCmd_apiError(t *testing.T) {
+	stub := &StubClient{
+		ListVlansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusUnauthorized, map[string]any{
+				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
+				"status": 401, "detail": "Bearer token missing",
+			}), nil
+		},
+	}
+	cmd := newListVlansCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Unauthorized") {
+		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
+	}
+}
+
+func TestGetVlanCmd_serverDhcp(t *testing.T) {
+	stub := &StubClient{
+		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.iot", "uri": "/network/vlans/unifi.iot",
+				"name": "IoT", "vlanId": 20, "subnet": "192.168.20.0/24",
+				"gatewayIp": "192.168.20.1", "broadcastIp": "192.168.20.255",
+				"dhcpMode": "server",
+				"dhcpRange": map[string]any{"start": "192.168.20.100", "end": "192.168.20.200"},
+				"dnsServers": []string{"1.1.1.1", "8.8.8.8"},
+			}), nil
+		},
+	}
+	cmd := newGetVlanCmd(stub)
+	cmd.SetArgs([]string{"unifi.iot"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"unifi.iot", "IoT", "20", "192.168.20.0/24", "192.168.20.1", "192.168.20.255", "server", "192.168.20.100", "192.168.20.200", "1.1.1.1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "RELAY") {
+		t.Errorf("expected no RELAY row for server DHCP, got:\n%s", out)
+	}
+}
+
+func TestGetVlanCmd_relayDhcp(t *testing.T) {
+	stub := &StubClient{
+		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.mgmt", "uri": "/network/vlans/unifi.mgmt",
+				"name": "Management", "vlanId": 99, "subnet": "10.0.99.0/24",
+				"gatewayIp": "10.0.99.1", "broadcastIp": "10.0.99.255",
+				"dhcpMode": "relay", "relayServer": "192.168.1.1",
+				"dnsServers": []string{"192.168.1.1"},
+			}), nil
+		},
+	}
+	cmd := newGetVlanCmd(stub)
+	cmd.SetArgs([]string{"unifi.mgmt"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Management", "relay", "192.168.1.1", "RELAY"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "DHCP RANGE") {
+		t.Errorf("expected no DHCP RANGE row for relay DHCP, got:\n%s", out)
+	}
+}
+
+func TestGetVlanCmd_notFound(t *testing.T) {
+	stub := &StubClient{
+		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusNotFound, map[string]any{
+				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
+				"status": 404, "detail": "vlan not found",
+			}), nil
+		},
+	}
+	cmd := newGetVlanCmd(stub)
+	cmd.SetArgs([]string{"unifi.nonexistent"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}
+
+func TestGetVlanCmd_disabledDhcp(t *testing.T) {
+	stub := &StubClient{
+		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.servers", "uri": "/network/vlans/unifi.servers",
+				"name": "Servers", "vlanId": 10, "subnet": "192.168.10.0/24",
+				"gatewayIp": "192.168.10.1", "broadcastIp": "192.168.10.255",
+				"dhcpMode": "disabled",
+				"dnsServers": []string{"1.1.1.1"},
+			}), nil
+		},
+	}
+	cmd := newGetVlanCmd(stub)
+	cmd.SetArgs([]string{"unifi.servers"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Servers", "disabled", "1.1.1.1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	for _, absent := range []string{"DHCP RANGE", "RELAY"} {
+		if strings.Contains(out, absent) {
+			t.Errorf("expected %q absent for disabled DHCP, got:\n%s", absent, out)
+		}
+	}
+}
+
+func TestListSsidsCmd_tableOutput(t *testing.T) {
+	stub := &StubClient{
+		ListSsidsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.SsidList{
+				Items: []gen.Ssid{
+					{
+						Id: "unifi.home", Name: "Home", VlanId: 1,
+						Bands:      []gen.WifiBand{gen.WifiBandBand2g, gen.WifiBandBand5g, gen.WifiBandBand6g},
+						NumClients: 12,
+					},
+					{
+						Id: "unifi.iot", Name: "IoT", VlanId: 20,
+						Bands:      []gen.WifiBand{gen.WifiBandBand2g, gen.WifiBandBand5g},
+						NumClients: 8,
+					},
+				},
+			}), nil
+		},
+	}
+	cmd := newListSsidsCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"unifi.home", "Home", "unifi.iot", "IoT", "2.4 GHz", "5 GHz", "6 GHz", "12", "8"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestListSsidsCmd_apiError(t *testing.T) {
+	stub := &StubClient{
+		ListSsidsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusUnauthorized, map[string]any{
+				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
+				"status": 401, "detail": "Bearer token missing",
+			}), nil
+		},
+	}
+	cmd := newListSsidsCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Unauthorized") {
+		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
+	}
+}
+
+func TestGetSsidCmd_withClients(t *testing.T) {
+	stub := &StubClient{
+		GetSsidFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.iot", "uri": "/network/ssids/unifi.iot",
+				"name": "IoT", "vlanId": 20,
+				"bands":      []string{"band2g", "band5g"},
+				"numClients": 2,
+				"securityProtocol": "wpa2",
+				"clients": []map[string]any{
+					{"kind": "client", "id": "unifi.sonos", "uri": "/network/clients/unifi.sonos", "name": "Sonos One SL"},
+					{"kind": "client", "id": "unifi.hue", "uri": "/network/clients/unifi.hue", "name": "Philips Hue Bridge"},
+				},
+				"broadcastingAps": []map[string]any{
+					{"kind": "device", "id": "unifi.ap-lr", "uri": "/network/devices/unifi.ap-lr", "name": "AP Living Room"},
+				},
+			}), nil
+		},
+	}
+	cmd := newGetSsidCmd(stub)
+	cmd.SetArgs([]string{"unifi.iot"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"unifi.iot", "IoT", "20", "wpa2", "Sonos One SL", "Philips Hue Bridge", "AP Living Room", "CLIENTS", "BROADCASTING APs"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestGetSsidCmd_notFound(t *testing.T) {
+	stub := &StubClient{
+		GetSsidFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusNotFound, map[string]any{
+				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
+				"status": 404, "detail": "ssid not found",
+			}), nil
+		},
+	}
+	cmd := newGetSsidCmd(stub)
+	cmd.SetArgs([]string{"unifi.nonexistent"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}
+
+func TestListWansCmd_tableOutput(t *testing.T) {
+	stub := &StubClient{
+		ListWansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, gen.WanList{
+				Items: []gen.Wan{
+					{Id: "unifi.wan1", Name: "WAN 1", IpAddress: "203.0.113.42", Uptime: 86400, Status: gen.WanStatusConnected},
+					{Id: "unifi.wan2", Name: "WAN 2", IpAddress: "198.51.100.7", Uptime: 0, Status: gen.WanStatusFailover},
+				},
+			}), nil
+		},
+	}
+	cmd := newListWansCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"unifi.wan1", "WAN 1", "203.0.113.42", "connected", "unifi.wan2", "failover"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestListWansCmd_apiError(t *testing.T) {
+	stub := &StubClient{
+		ListWansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusUnauthorized, map[string]any{
+				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
+				"status": 401, "detail": "Bearer token missing",
+			}), nil
+		},
+	}
+	cmd := newListWansCmd(stub)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Unauthorized") {
+		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
+	}
+}
+
+func TestGetWanCmd_connected(t *testing.T) {
+	stub := &StubClient{
+		GetWanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusOK, map[string]any{
+				"id": "unifi.wan1", "uri": "/network/wans/unifi.wan1",
+				"name": "WAN 1", "ipAddress": "203.0.113.42",
+				"uptime": 86400, "status": "connected",
+				"dnsServers": []string{"1.1.1.1", "1.0.0.1"},
+			}), nil
+		},
+	}
+	cmd := newGetWanCmd(stub)
+	cmd.SetArgs([]string{"unifi.wan1"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"unifi.wan1", "WAN 1", "203.0.113.42", "connected", "1d", "1.1.1.1", "1.0.0.1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestGetWanCmd_notFound(t *testing.T) {
+	stub := &StubClient{
+		GetWanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
+			return jsonResponse(http.StatusNotFound, map[string]any{
+				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
+				"status": 404, "detail": "wan not found",
+			}), nil
+		},
+	}
+	cmd := newGetWanCmd(stub)
+	cmd.SetArgs([]string{"unifi.nonexistent"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected 'Not Found' in error, got: %v", err)
+	}
+}

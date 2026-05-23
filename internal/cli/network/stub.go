@@ -19,6 +19,12 @@ type StubClient struct {
 	ListNetworkClientsFunc func(ctx context.Context, params *gen.ListNetworkClientsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetNetworkClientFunc   func(ctx context.Context, clientId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 	GetNetworkTopologyFunc func(ctx context.Context, params *gen.GetNetworkTopologyParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListVlansFunc         func(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetVlanFunc           func(ctx context.Context, vlanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListSsidsFunc         func(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetSsidFunc           func(ctx context.Context, ssidId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListWansFunc          func(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	GetWanFunc            func(ctx context.Context, wanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
 }
 
 func (s *StubClient) ListNetworkDevices(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
@@ -39,6 +45,30 @@ func (s *StubClient) GetNetworkClient(ctx context.Context, clientId string, reqE
 
 func (s *StubClient) GetNetworkTopology(ctx context.Context, params *gen.GetNetworkTopologyParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
 	return s.GetNetworkTopologyFunc(ctx, params, reqEditors...)
+}
+
+func (s *StubClient) ListVlans(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.ListVlansFunc(ctx, reqEditors...)
+}
+
+func (s *StubClient) GetVlan(ctx context.Context, vlanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.GetVlanFunc(ctx, vlanId, reqEditors...)
+}
+
+func (s *StubClient) ListSsids(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.ListSsidsFunc(ctx, reqEditors...)
+}
+
+func (s *StubClient) GetSsid(ctx context.Context, ssidId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.GetSsidFunc(ctx, ssidId, reqEditors...)
+}
+
+func (s *StubClient) ListWans(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.ListWansFunc(ctx, reqEditors...)
+}
+
+func (s *StubClient) GetWan(ctx context.Context, wanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error) {
+	return s.GetWanFunc(ctx, wanId, reqEditors...)
 }
 
 // jsonResponse builds an *http.Response with a JSON body and the given status code.
