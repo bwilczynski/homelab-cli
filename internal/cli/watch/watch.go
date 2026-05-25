@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +23,12 @@ import (
 )
 
 const minInterval = 100 * time.Millisecond
+
+const (
+	ansiClearScreen = "\x1b[H\x1b[2J\x1b[3J" // cursor home + erase display + erase scrollback
+	ansiHideCursor  = "\x1b[?25l"
+	ansiShowCursor  = "\x1b[?25h"
+)
 
 // TickFunc is the per-tick body executed by the watch loop. It writes its
 // rendered output to w and uses ctx for any cancellable work (e.g. HTTP calls).
@@ -55,8 +62,18 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	tty := isTerminal(w)
 	jsonMode := flags.GetOutputFormat() == output.FormatJSON
+
+	if tty && !jsonMode {
+		fmt.Fprint(w, ansiHideCursor)
+		defer fmt.Fprint(w, ansiShowCursor)
+	}
+
 	tick := func() {
+		if tty && !jsonMode {
+			fmt.Fprint(w, ansiClearScreen)
+		}
 		if !jsonMode {
 			writeHeader(w, cmd, interval)
 		}
@@ -68,7 +85,7 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 				fmt.Fprintf(w, "error: %v\n", err)
 			}
 		}
-		if !jsonMode {
+		if !jsonMode && !tty {
 			fmt.Fprintln(w)
 		}
 	}
@@ -87,11 +104,19 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 }
 
 func writeHeader(w io.Writer, cmd *cobra.Command, interval time.Duration) {
-	if isTerminal(w) {
-		// TTY header implemented in Task 8.
+	if !isTerminal(w) {
+		fmt.Fprintf(w, "--- %s  %s ---\n", time.Now().Format(time.RFC3339), cmd.CommandPath())
 		return
 	}
-	fmt.Fprintf(w, "--- %s  %s ---\n", time.Now().Format(time.RFC3339), cmd.CommandPath())
+	left := fmt.Sprintf("Every %s: %s", interval, cmd.CommandPath())
+	right := time.Now().Format("15:04:05")
+	cols, _, err := term.GetSize(int(w.(*os.File).Fd()))
+	if err != nil || cols < len(left)+len(right)+1 {
+		fmt.Fprintf(w, "%s    %s\n\n", left, right)
+		return
+	}
+	pad := cols - len(left) - len(right)
+	fmt.Fprintf(w, "%s%s%s\n\n", left, strings.Repeat(" ", pad), right)
 }
 
 func isTerminal(w io.Writer) bool {
