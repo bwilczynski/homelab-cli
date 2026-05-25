@@ -26,10 +26,11 @@ import (
 const minInterval = 100 * time.Millisecond
 
 const (
-	ansiHideCursor = "\x1b[?25l"
-	ansiShowCursor = "\x1b[?25h"
-	ansiCursorHome = "\x1b[H"
-	ansiEraseToEnd = "\x1b[J" // erase from cursor to end of screen
+	ansiHideCursor   = "\x1b[?25l"
+	ansiShowCursor   = "\x1b[?25h"
+	ansiCursorHome   = "\x1b[H"
+	ansiEraseToEnd   = "\x1b[J"  // erase from cursor to end of screen
+	ansiEraseDisplay = "\x1b[2J" // erase entire visible display
 )
 
 // TickFunc is the per-tick body executed by the watch loop. It writes its
@@ -73,7 +74,9 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 	jsonMode := flags.GetOutputFormat() == output.FormatJSON
 
 	if tty && !jsonMode {
-		fmt.Fprint(w, ansiHideCursor)
+		// One-time wipe of whatever the terminal had before the loop started;
+		// subsequent ticks redraw in place via cursor-home + erase-to-end.
+		fmt.Fprint(w, ansiCursorHome+ansiEraseDisplay+ansiHideCursor)
 		defer fmt.Fprint(w, ansiShowCursor)
 	}
 
@@ -160,4 +163,3 @@ func ttyCols(w io.Writer) int {
 	}
 	return cols
 }
-
