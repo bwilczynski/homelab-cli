@@ -7,11 +7,20 @@ package watch
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
+
+const minInterval = 100 * time.Millisecond
 
 // TickFunc is the per-tick body executed by the watch loop. It writes its
 // rendered output to w and uses ctx for any cancellable work (e.g. HTTP calls).
@@ -32,7 +41,53 @@ func Wrap(fn TickFunc) func(cmd *cobra.Command, args []string) error {
 		if !watching {
 			return fn(cmd.Context(), cmd.OutOrStdout())
 		}
-		// Loop path implemented in later tasks.
-		return nil
+		interval, _ := cmd.Flags().GetDuration("watch-interval")
+		return loop(cmd, interval, fn)
 	}
 }
+
+func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
+	w := cmd.OutOrStdout()
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	tick := func() {
+		writeHeader(w, cmd, interval)
+		if err := fn(ctx, w); err != nil {
+			fmt.Fprintf(w, "error: %v\n", err)
+		}
+		fmt.Fprintln(w)
+	}
+
+	tick()
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-t.C:
+			tick()
+		}
+	}
+}
+
+func writeHeader(w io.Writer, cmd *cobra.Command, interval time.Duration) {
+	if isTerminal(w) {
+		// TTY header implemented in Task 8.
+		return
+	}
+	fmt.Fprintf(w, "--- %s  %s ---\n", time.Now().Format(time.RFC3339), cmd.Use)
+}
+
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(int(f.Fd()))
+}
+
+// unused-but-kept imports placeholders — Task 5 removes these as it actually uses them.
+var _ = flags.GetOutputFormat
+var _ = output.FormatJSON
