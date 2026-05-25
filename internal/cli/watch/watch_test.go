@@ -67,17 +67,19 @@ func TestWrap_nonTTY_appendsSnapshots(t *testing.T) {
 		return nil
 	}
 
-	cmd := &cobra.Command{Use: "hlctl test"}
+	root := &cobra.Command{Use: "hlctl"}
+	cmd := &cobra.Command{Use: "test"}
+	root.AddCommand(cmd)
 	RegisterFlags(cmd)
 	cmd.RunE = Wrap(fn)
-	cmd.SetContext(ctx)
-	cmd.SetArgs([]string{"--watch", "--watch-interval=100ms"})
+	root.SetContext(ctx)
+	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
 
 	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+	root.SetOut(buf)
+	root.SetErr(buf)
 
-	if err := cmd.Execute(); err != nil {
+	if err := root.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got := calls.Load(); got != 3 {

@@ -77,7 +77,7 @@ func writeHeader(w io.Writer, cmd *cobra.Command, interval time.Duration) {
 		// TTY header implemented in Task 8.
 		return
 	}
-	fmt.Fprintf(w, "--- %s  %s ---\n", time.Now().Format(time.RFC3339), cmd.Use)
+	fmt.Fprintf(w, "--- %s  %s ---\n", time.Now().Format(time.RFC3339), cmd.CommandPath())
 }
 
 func isTerminal(w io.Writer) bool {
