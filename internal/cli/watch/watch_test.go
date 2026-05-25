@@ -197,3 +197,45 @@ func TestWrap_jsonMode_errorIsValidJSON(t *testing.T) {
 		t.Errorf("expected error field, got: %v", got)
 	}
 }
+
+func TestWrap_nonTTY_tickError_continues(t *testing.T) {
+	var calls atomic.Int32
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fn := func(_ context.Context, w io.Writer) error {
+		n := calls.Add(1)
+		switch n {
+		case 1:
+			_, _ = w.Write([]byte("ok-1\n"))
+		case 2:
+			return errors.New("boom")
+		case 3:
+			_, _ = w.Write([]byte("ok-3\n"))
+			cancel()
+		}
+		return nil
+	}
+
+	root := &cobra.Command{Use: "hlctl"}
+	cmd := &cobra.Command{Use: "test"}
+	root.AddCommand(cmd)
+	RegisterFlags(cmd)
+	cmd.RunE = Wrap(fn)
+	root.SetContext(ctx)
+	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
+
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error from loop: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"ok-1", "error: boom", "ok-3"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
