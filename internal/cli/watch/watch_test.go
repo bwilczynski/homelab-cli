@@ -198,6 +198,26 @@ func TestWrap_jsonMode_errorIsValidJSON(t *testing.T) {
 	}
 }
 
+func TestWrap_intervalBelowMinimum_returnsError(t *testing.T) {
+	fn := func(_ context.Context, _ io.Writer) error { return nil }
+	cmd := &cobra.Command{Use: "test"}
+	RegisterFlags(cmd)
+	cmd.RunE = Wrap(fn)
+	cmd.SetArgs([]string{"--watch", "--watch-interval=10ms"})
+
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "100ms") {
+		t.Errorf("expected error to mention 100ms minimum, got: %v", err)
+	}
+}
+
 func TestWrap_nonTTY_tickError_continues(t *testing.T) {
 	var calls atomic.Int32
 	ctx, cancel := context.WithCancel(context.Background())

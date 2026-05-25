@@ -43,6 +43,9 @@ func Wrap(fn TickFunc) func(cmd *cobra.Command, args []string) error {
 			return fn(cmd.Context(), cmd.OutOrStdout())
 		}
 		interval, _ := cmd.Flags().GetDuration("watch-interval")
+		if interval < minInterval {
+			return fmt.Errorf("--watch-interval must be at least %s", minInterval)
+		}
 		return loop(cmd, interval, fn)
 	}
 }
