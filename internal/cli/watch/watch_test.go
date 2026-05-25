@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -148,5 +149,51 @@ func TestWrap_jsonMode_emitsNDJSON(t *testing.T) {
 		if err := json.Unmarshal([]byte(line), &got); err != nil {
 			t.Errorf("line %d not valid JSON: %v (%q)", i, err, line)
 		}
+	}
+}
+
+func TestWrap_jsonMode_errorIsValidJSON(t *testing.T) {
+	prev := flags.OutputFormat
+	flags.OutputFormat = "json"
+	t.Cleanup(func() { flags.OutputFormat = prev })
+
+	var calls atomic.Int32
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Error containing a control byte and an invalid UTF-8 byte. %q would
+	// emit \x01 / \xff which are NOT valid JSON escapes. json.Marshal must
+	// be used instead, which encodes invalid UTF-8 as U+FFFD.
+	fn := func(_ context.Context, _ io.Writer) error {
+		calls.Add(1)
+		cancel()
+		return errors.New("boom \x01 \xff end")
+	}
+
+	root := &cobra.Command{Use: "hlctl"}
+	cmd := &cobra.Command{Use: "test"}
+	root.AddCommand(cmd)
+	RegisterFlags(cmd)
+	cmd.RunE = Wrap(fn)
+	root.SetContext(ctx)
+	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
+
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	line := strings.TrimRight(buf.String(), "\n")
+	if line == "" {
+		t.Fatal("expected one JSON error line, got empty output")
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(line), &got); err != nil {
+		t.Fatalf("error line is not valid JSON: %v (%q)", err, line)
+	}
+	if _, ok := got["error"]; !ok {
+		t.Errorf("expected error field, got: %v", got)
 	}
 }

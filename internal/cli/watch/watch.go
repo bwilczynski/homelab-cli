@@ -7,6 +7,7 @@ package watch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -58,7 +59,8 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 		}
 		if err := fn(ctx, w); err != nil {
 			if jsonMode {
-				fmt.Fprintf(w, `{"error":%q}`+"\n", err.Error())
+				b, _ := json.Marshal(err.Error())
+				fmt.Fprintf(w, `{"error":%s}`+"\n", b)
 			} else {
 				fmt.Fprintf(w, "error: %v\n", err)
 			}
