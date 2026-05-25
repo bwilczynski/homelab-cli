@@ -472,52 +472,53 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "topology",
 		Short: "Show network topology",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			params := &gen.GetNetworkTopologyParams{}
-			if includeClients || includeWireless {
-				t := true
-				params.IncludeClients = &t
-			}
-
-			resp, err := c.GetNetworkTopology(context.Background(), params)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
-				return nil
-			}
-
-			var topo gen.NetworkTopology
-			if err := json.Unmarshal(body, &topo); err != nil {
-				return err
-			}
-
-			return printTopologyTree(cmd.OutOrStdout(), topo, includeWireless)
-		},
 	}
+	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+		c := client
+		if c == nil {
+			var err error
+			c, err = buildClient()
+			if err != nil {
+				return err
+			}
+		}
+
+		params := &gen.GetNetworkTopologyParams{}
+		if includeClients || includeWireless {
+			t := true
+			params.IncludeClients = &t
+		}
+
+		resp, err := c.GetNetworkTopology(ctx, params)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return apiclient.ParseError(resp)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if flags.GetOutputFormat() == output.FormatJSON {
+			fmt.Fprint(w, string(body))
+			return nil
+		}
+
+		var topo gen.NetworkTopology
+		if err := json.Unmarshal(body, &topo); err != nil {
+			return err
+		}
+
+		return printTopologyTree(w, topo, includeWireless)
+	})
 
 	cmd.Flags().BoolVar(&includeClients, "include-clients", false, "Include wired clients in the topology")
 	cmd.Flags().BoolVar(&includeWireless, "include-wireless", false, "Also include wireless clients (implies --include-clients)")
+	watch.RegisterFlags(cmd)
 	return cmd
 }
 
