@@ -32,6 +32,11 @@ const (
 
 // TickFunc is the per-tick body executed by the watch loop. It writes its
 // rendered output to w and uses ctx for any cancellable work (e.g. HTTP calls).
+//
+// In JSON output mode (flags.GetOutputFormat() == output.FormatJSON), fn must
+// write exactly one compact JSON document with no trailing newline; the loop
+// appends the NDJSON newline separator. Do NOT call output.Print in JSON mode
+// — it pretty-prints with indentation, which breaks NDJSON.
 type TickFunc func(ctx context.Context, w io.Writer) error
 
 // RegisterFlags adds --watch/-w and --watch-interval to cmd.
@@ -84,6 +89,8 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 			} else {
 				fmt.Fprintf(w, "error: %v\n", err)
 			}
+		} else if jsonMode {
+			fmt.Fprintln(w)
 		}
 		if !jsonMode && !tty {
 			fmt.Fprintln(w)

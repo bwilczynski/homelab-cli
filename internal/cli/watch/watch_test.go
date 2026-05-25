@@ -112,7 +112,7 @@ func TestWrap_jsonMode_emitsNDJSON(t *testing.T) {
 
 	fn := func(_ context.Context, w io.Writer) error {
 		n := calls.Add(1)
-		_, _ = fmt.Fprintf(w, `{"tick":%d}`+"\n", n)
+		_, _ = fmt.Fprintf(w, `{"tick":%d}`, n)
 		if n == 3 {
 			cancel()
 		}
