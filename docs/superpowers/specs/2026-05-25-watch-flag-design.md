@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add a `--watch` / `-w` flag (with optional `--watch-interval`) to list-style `hlctl` commands so users can re-run them on a fixed interval without writing a shell loop. Initial integration: `hlctl system utilization`, `hlctl docker containers list`, `hlctl network clients list`. A reusable helper in a new `internal/cli/watch` package lets any future command opt in with a one-line change.
+Add a `--watch` / `-w` flag (with optional `--watch-interval`) to list-style `hlctl` commands so users can re-run them on a fixed interval without writing a shell loop. Initial integration: `hlctl system utilization`, `hlctl docker containers list`, `hlctl network clients list`, `hlctl network topology`. A reusable helper in a new `internal/cli/watch` package lets any future command opt in with a one-line change.
 
 The model is `watch(1)`-style — clear the screen and redraw each tick. When stdout is not a TTY, fall back to appending each snapshot so output remains pipe-friendly.
 
@@ -99,17 +99,20 @@ The loop returns `nil` on signal-driven exit; the process exits 0.
 
 ## Integration sites
 
-Three commands rewrite their `RunE` to use `watch.Wrap`. Each existing body becomes a closure that writes to the passed `io.Writer` instead of `cmd.OutOrStdout()`. No other behavioral changes.
+Four commands rewrite their `RunE` to use `watch.Wrap`. Each existing body becomes a closure that writes to the passed `io.Writer` instead of `cmd.OutOrStdout()`. No other behavioral changes.
 
 - `internal/cli/system/system.go` — `newUtilizationCmd`
 - `internal/cli/docker/docker.go` — `newListCmd` (containers)
 - `internal/cli/network/network.go` — `newListClientsCmd`
+- `internal/cli/network/network.go` — `newTopologyCmd`
 
 For each command:
 1. Move the body of `RunE` into a `func(ctx context.Context, w io.Writer) error` closure.
 2. Replace direct `cmd.OutOrStdout()` writes with the passed `w`.
 3. Use `ctx` for the API call (`c.ListContainers(ctx, params)` instead of `context.Background()`).
 4. Wrap with `watch.Wrap(...)` and call `watch.RegisterFlags(cmd)`.
+
+For `newTopologyCmd` specifically: `printTopologyTree` already accepts an `io.Writer`, so the integration is just substituting the writer and threading `ctx`. The `--include-clients` / `--include-wireless` flags continue to work unchanged — they're read once per tick from the cobra command, so toggling them mid-loop isn't supported (matches every other watched command).
 
 Switching to `ctx` for the API call means a Ctrl-C during a slow request cancels it cleanly — small but worthwhile correctness improvement that comes for free.
 
