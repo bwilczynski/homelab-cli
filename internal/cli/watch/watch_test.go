@@ -3,11 +3,14 @@ package watch
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -94,5 +97,56 @@ func TestWrap_nonTTY_appendsSnapshots(t *testing.T) {
 	headerCount := strings.Count(out, "--- ")
 	if headerCount != 3 {
 		t.Errorf("expected 3 header separators, got %d", headerCount)
+	}
+}
+
+func TestWrap_jsonMode_emitsNDJSON(t *testing.T) {
+	prev := flags.OutputFormat
+	flags.OutputFormat = "json"
+	t.Cleanup(func() { flags.OutputFormat = prev })
+
+	var calls atomic.Int32
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fn := func(_ context.Context, w io.Writer) error {
+		n := calls.Add(1)
+		_, _ = fmt.Fprintf(w, `{"tick":%d}`+"\n", n)
+		if n == 3 {
+			cancel()
+		}
+		return nil
+	}
+
+	root := &cobra.Command{Use: "hlctl"}
+	cmd := &cobra.Command{Use: "test"}
+	root.AddCommand(cmd)
+	RegisterFlags(cmd)
+	cmd.RunE = Wrap(fn)
+	root.SetContext(ctx)
+	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
+
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetErr(buf)
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := calls.Load(); got != 3 {
+		t.Errorf("expected 3 calls, got %d", got)
+	}
+	if strings.Contains(buf.String(), "---") {
+		t.Errorf("JSON mode must not emit text header; got:\n%s", buf.String())
+	}
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d:\n%s", len(lines), buf.String())
+	}
+	for i, line := range lines {
+		var got map[string]any
+		if err := json.Unmarshal([]byte(line), &got); err != nil {
+			t.Errorf("line %d not valid JSON: %v (%q)", i, err, line)
+		}
 	}
 }

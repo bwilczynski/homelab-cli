@@ -51,12 +51,21 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	jsonMode := flags.GetOutputFormat() == output.FormatJSON
 	tick := func() {
-		writeHeader(w, cmd, interval)
-		if err := fn(ctx, w); err != nil {
-			fmt.Fprintf(w, "error: %v\n", err)
+		if !jsonMode {
+			writeHeader(w, cmd, interval)
 		}
-		fmt.Fprintln(w)
+		if err := fn(ctx, w); err != nil {
+			if jsonMode {
+				fmt.Fprintf(w, `{"error":%q}`+"\n", err.Error())
+			} else {
+				fmt.Fprintf(w, "error: %v\n", err)
+			}
+		}
+		if !jsonMode {
+			fmt.Fprintln(w)
+		}
 	}
 
 	tick()
@@ -88,6 +97,3 @@ func isTerminal(w io.Writer) bool {
 	return term.IsTerminal(int(f.Fd()))
 }
 
-// unused-but-kept imports placeholders — Task 5 removes these as it actually uses them.
-var _ = flags.GetOutputFormat
-var _ = output.FormatJSON
