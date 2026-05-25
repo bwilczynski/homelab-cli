@@ -6,6 +6,7 @@
 package watch
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,9 +26,10 @@ import (
 const minInterval = 100 * time.Millisecond
 
 const (
-	ansiClearScreen = "\x1b[H\x1b[2J\x1b[3J" // cursor home + erase display + erase scrollback
-	ansiHideCursor  = "\x1b[?25l"
-	ansiShowCursor  = "\x1b[?25h"
+	ansiHideCursor = "\x1b[?25l"
+	ansiShowCursor = "\x1b[?25h"
+	ansiCursorHome = "\x1b[H"
+	ansiEraseToEnd = "\x1b[J" // erase from cursor to end of screen
 )
 
 // TickFunc is the per-tick body executed by the watch loop. It writes its
@@ -76,11 +78,22 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 	}
 
 	tick := func() {
+		// TTY+table: render into a buffer, then write cursor-home + content +
+		// erase-to-end in a single sequence. This double-buffering removes the
+		// flicker that ANSI erase-then-redraw would otherwise produce.
 		if tty && !jsonMode {
-			fmt.Fprint(w, ansiClearScreen)
+			var buf bytes.Buffer
+			writeTTYHeader(&buf, cmd, interval, ttyCols(w))
+			if err := fn(ctx, &buf); err != nil {
+				fmt.Fprintf(&buf, "error: %v\n", err)
+			}
+			fmt.Fprint(w, ansiCursorHome)
+			_, _ = w.Write(buf.Bytes())
+			fmt.Fprint(w, ansiEraseToEnd)
+			return
 		}
 		if !jsonMode {
-			writeHeader(w, cmd, interval)
+			writeNonTTYHeader(w, cmd)
 		}
 		if err := fn(ctx, w); err != nil {
 			if jsonMode {
@@ -110,15 +123,14 @@ func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
 	}
 }
 
-func writeHeader(w io.Writer, cmd *cobra.Command, interval time.Duration) {
-	if !isTerminal(w) {
-		fmt.Fprintf(w, "--- %s  %s ---\n", time.Now().Format(time.RFC3339), cmd.CommandPath())
-		return
-	}
+func writeNonTTYHeader(w io.Writer, cmd *cobra.Command) {
+	fmt.Fprintf(w, "--- %s  %s ---\n", time.Now().Format(time.RFC3339), cmd.CommandPath())
+}
+
+func writeTTYHeader(w io.Writer, cmd *cobra.Command, interval time.Duration, cols int) {
 	left := fmt.Sprintf("Every %s: %s", interval, cmd.CommandPath())
 	right := time.Now().Format("15:04:05")
-	cols, _, err := term.GetSize(int(w.(*os.File).Fd()))
-	if err != nil || cols < len(left)+len(right)+1 {
+	if cols < len(left)+len(right)+1 {
 		fmt.Fprintf(w, "%s    %s\n\n", left, right)
 		return
 	}
@@ -132,5 +144,20 @@ func isTerminal(w io.Writer) bool {
 		return false
 	}
 	return term.IsTerminal(int(f.Fd()))
+}
+
+// ttyCols returns the terminal column count, or 0 if w is not a terminal or
+// the size cannot be determined. writeTTYHeader treats 0 as "fall back to a
+// fixed gap" so callers do not need to special-case it.
+func ttyCols(w io.Writer) int {
+	f, ok := w.(*os.File)
+	if !ok {
+		return 0
+	}
+	cols, _, err := term.GetSize(int(f.Fd()))
+	if err != nil {
+		return 0
+	}
+	return cols
 }
 
