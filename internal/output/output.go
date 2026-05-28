@@ -139,6 +139,9 @@ func FormatUptime(seconds int) string {
 // RenderTemplate executes the named template from fsys into w, with a tabwriter
 // for column alignment. Call {{ flush }} in the template between independent
 // table sections to reset column-width tracking.
+//
+// The template set is re-parsed on every call because the flush func must close
+// over the per-call tabwriter — caching the parsed template would prevent this.
 func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
