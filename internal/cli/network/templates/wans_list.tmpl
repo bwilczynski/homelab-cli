@@ -1,0 +1,4 @@
+ID	NAME	IP	UPTIME	STATUS
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .IpAddress }}	{{ formatUptime .Uptime }}	{{ .Status }}
+{{ end -}}

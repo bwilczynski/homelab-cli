@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
@@ -63,16 +62,7 @@ func newListWansCmd(client NetworkClient) *cobra.Command {
 				return err
 			}
 
-			headers := []string{"ID", "NAME", "IP", "UPTIME", "STATUS"}
-			var rows [][]string
-			for _, w := range list.Items {
-				rows = append(rows, []string{
-					w.Id, w.Name, w.IpAddress,
-					output.FormatUptime(w.Uptime),
-					string(w.Status),
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "wans_list.tmpl", list)
 		},
 	}
 }
@@ -116,16 +106,7 @@ func newGetWanCmd(client NetworkClient) *cobra.Command {
 				return err
 			}
 
-			headers := []string{"FIELD", "VALUE"}
-			rows := [][]string{
-				{"ID", detail.Id},
-				{"NAME", detail.Name},
-				{"IP", detail.IpAddress},
-				{"UPTIME", output.FormatUptime(detail.Uptime)},
-				{"STATUS", string(detail.Status)},
-				{"DNS", strings.Join(detail.DnsServers, ", ")},
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), nil, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "wans_get.tmpl", detail)
 		},
 	}
 }
