@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
@@ -63,14 +62,7 @@ func newListVlansCmd(client NetworkClient) *cobra.Command {
 				return err
 			}
 
-			headers := []string{"ID", "NAME", "VLAN ID", "SUBNET"}
-			var rows [][]string
-			for _, v := range list.Items {
-				rows = append(rows, []string{
-					v.Id, v.Name, fmt.Sprintf("%d", v.VlanId), v.Subnet,
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "vlans_list.tmpl", list)
 		},
 	}
 }
@@ -114,24 +106,7 @@ func newGetVlanCmd(client NetworkClient) *cobra.Command {
 				return err
 			}
 
-			headers := []string{"FIELD", "VALUE"}
-			rows := [][]string{
-				{"ID", detail.Id},
-				{"NAME", detail.Name},
-				{"VLAN ID", fmt.Sprintf("%d", detail.VlanId)},
-				{"SUBNET", detail.Subnet},
-				{"GATEWAY IP", detail.GatewayIp},
-				{"BROADCAST", detail.BroadcastIp},
-				{"DHCP MODE", string(detail.DhcpMode)},
-			}
-			if detail.DhcpMode == gen.DhcpModeServer && detail.DhcpRange != nil {
-				rows = append(rows, []string{"DHCP RANGE", fmt.Sprintf("%s - %s", detail.DhcpRange.Start, detail.DhcpRange.End)})
-			}
-			if detail.DhcpMode == gen.DhcpModeRelay && detail.RelayServer != nil {
-				rows = append(rows, []string{"RELAY", *detail.RelayServer})
-			}
-			rows = append(rows, []string{"DNS", strings.Join(detail.DnsServers, ", ")})
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), nil, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "vlans_get.tmpl", detail)
 		},
 	}
 }

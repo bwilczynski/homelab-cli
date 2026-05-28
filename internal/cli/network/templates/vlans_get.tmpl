@@ -1,0 +1,15 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+VLAN ID	{{ .VlanId }}
+SUBNET	{{ .Subnet }}
+GATEWAY IP	{{ .GatewayIp }}
+BROADCAST	{{ .BroadcastIp }}
+DHCP MODE	{{ .DhcpMode }}
+{{- if and (eq (string .DhcpMode) "server") .DhcpRange }}
+DHCP RANGE	{{ .DhcpRange.Start }} - {{ .DhcpRange.End }}
+{{- end }}
+{{- if and (eq (string .DhcpMode) "relay") .RelayServer }}
+RELAY	{{ derefStr .RelayServer }}
+{{- end }}
+DNS	{{ join .DnsServers ", " }}
