@@ -340,10 +340,16 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 	}
 }
 
-type childEntry struct {
-	nodeID   string
-	nodeDisp string
-	edgeDisp string
+type topologyTree struct {
+	GatewayID      string
+	GatewayDisplay string
+	Adjacency      map[string][]topologyEdge
+}
+
+type topologyEdge struct {
+	ID       string
+	Display  string
+	EdgeDisp string
 }
 
 func newTopologyCmd(client NetworkClient) *cobra.Command {
@@ -393,8 +399,11 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 		if err := json.Unmarshal(body, &topo); err != nil {
 			return err
 		}
-
-		return printTopologyTree(w, topo, includeWireless)
+		tree, err := buildTopologyTree(topo, includeWireless)
+		if err != nil {
+			return err
+		}
+		return output.RenderTemplate(w, networkTemplates, "topology.tmpl", tree)
 	})
 
 	cmd.Flags().BoolVar(&includeClients, "include-clients", false, "Include wired clients in the topology")
@@ -403,20 +412,20 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 	return cmd
 }
 
-func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bool) error {
-	// Build node display strings keyed by node ID.
+func buildTopologyTree(topo gen.NetworkTopology, includeWireless bool) (topologyTree, error) {
 	nodeDisp := make(map[string]string)
 	var gatewayID string
+
 	for _, n := range topo.Nodes {
 		disc, err := n.Discriminator()
 		if err != nil {
-			return err
+			return topologyTree{}, err
 		}
 		switch disc {
 		case "device":
 			d, err := n.AsTopologyDeviceNode()
 			if err != nil {
-				return err
+				return topologyTree{}, err
 			}
 			disp := fmt.Sprintf("%s (%s)", d.Name, string(d.Type))
 			if d.NumClients != nil && *d.NumClients > 0 {
@@ -429,32 +438,32 @@ func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bo
 		case "client":
 			cl, err := n.AsTopologyClientNode()
 			if err != nil {
-				return err
+				return topologyTree{}, err
 			}
 			nodeDisp[cl.Id] = fmt.Sprintf("%s (client, %s, %s)", cl.Name, string(cl.ConnectionType), string(cl.Status))
 		}
 	}
 
 	if gatewayID == "" {
-		return fmt.Errorf("no gateway node found in topology")
+		return topologyTree{}, fmt.Errorf("no gateway node found in topology")
 	}
 
-	// Build adjacency map: parent node ID → []childEntry.
-	adjacency := make(map[string][]childEntry)
+	adjacency := make(map[string][]topologyEdge)
+
 	for _, e := range topo.Edges {
 		disc, err := e.Discriminator()
 		if err != nil {
-			return err
+			return topologyTree{}, err
 		}
 		switch disc {
 		case "wired":
 			we, err := e.AsTopologyWiredEdge()
 			if err != nil {
-				return err
+				return topologyTree{}, err
 			}
 			srcID, err := connectionRefID(we.Source)
 			if err != nil {
-				return err
+				return topologyTree{}, err
 			}
 			edgeDisp := ""
 			if we.Port != nil && we.LinkSpeed != nil {
@@ -462,10 +471,10 @@ func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bo
 			} else if we.Port != nil {
 				edgeDisp = fmt.Sprintf("[port %d]", *we.Port)
 			}
-			adjacency[we.Target.Id] = append(adjacency[we.Target.Id], childEntry{
-				nodeID:   srcID,
-				nodeDisp: nodeDisp[srcID],
-				edgeDisp: edgeDisp,
+			adjacency[we.Target.Id] = append(adjacency[we.Target.Id], topologyEdge{
+				ID:       srcID,
+				Display:  nodeDisp[srcID],
+				EdgeDisp: edgeDisp,
 			})
 		case "wireless":
 			if !includeWireless {
@@ -473,27 +482,25 @@ func printTopologyTree(w io.Writer, topo gen.NetworkTopology, includeWireless bo
 			}
 			wire, err := e.AsTopologyWirelessEdge()
 			if err != nil {
-				return err
+				return topologyTree{}, err
 			}
 			edgeDisp := fmt.Sprintf("[%s]", wire.Ssid)
 			if wire.SignalStrength != nil {
 				edgeDisp = fmt.Sprintf("[%s, %d dBm]", wire.Ssid, *wire.SignalStrength)
 			}
-			adjacency[wire.Target.Id] = append(adjacency[wire.Target.Id], childEntry{
-				nodeID:   wire.Source.Id,
-				nodeDisp: nodeDisp[wire.Source.Id],
-				edgeDisp: edgeDisp,
+			adjacency[wire.Target.Id] = append(adjacency[wire.Target.Id], topologyEdge{
+				ID:       wire.Source.Id,
+				Display:  nodeDisp[wire.Source.Id],
+				EdgeDisp: edgeDisp,
 			})
 		}
 	}
 
-	// Print the tree rooted at the gateway.
-	fmt.Fprintln(w, nodeDisp[gatewayID])
-	children := adjacency[gatewayID]
-	for i, child := range children {
-		printTopologyNode(w, child, adjacency, "", i == len(children)-1)
-	}
-	return nil
+	return topologyTree{
+		GatewayID:      gatewayID,
+		GatewayDisplay: nodeDisp[gatewayID],
+		Adjacency:      adjacency,
+	}, nil
 }
 
 func connectionRefID(ref gen.NetworkConnectionRef) (string, error) {
@@ -519,22 +526,3 @@ func connectionRefID(ref gen.NetworkConnectionRef) (string, error) {
 	}
 }
 
-func printTopologyNode(w io.Writer, entry childEntry, adjacency map[string][]childEntry, prefix string, isLast bool) {
-	connector := "├── "
-	childPrefix := "│   "
-	if isLast {
-		connector = "└── "
-		childPrefix = "    "
-	}
-
-	line := entry.nodeDisp
-	if entry.edgeDisp != "" {
-		line += " " + entry.edgeDisp
-	}
-	fmt.Fprintln(w, prefix+connector+line)
-
-	children := adjacency[entry.nodeID]
-	for i, child := range children {
-		printTopologyNode(w, child, adjacency, prefix+childPrefix, i == len(children)-1)
-	}
-}
