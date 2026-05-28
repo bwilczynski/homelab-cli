@@ -268,20 +268,7 @@ func newListClientsCmd(client NetworkClient) *cobra.Command {
 			return nil
 		}
 
-		headers := []string{"ID", "NAME", "MAC", "IP", "STATUS", "CONNECTION"}
-		var rows [][]string
-		for _, cl := range list.Items {
-			ip := ""
-			if cl.Ip != nil {
-				ip = *cl.Ip
-			}
-			rows = append(rows, []string{
-				cl.Id, cl.Name, cl.Mac, ip,
-				string(cl.Status),
-				string(cl.ConnectionType),
-			})
-		}
-		return output.Print(w, flags.GetOutputFormat(), list, headers, rows)
+		return output.RenderTemplate(w, networkTemplates, "clients_list.tmpl", list)
 	})
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
 	watch.RegisterFlags(cmd)
@@ -331,67 +318,24 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 				return err
 			}
 
-			headers := []string{"FIELD", "VALUE"}
-			var rows [][]string
-
 			switch disc {
 			case "wired":
 				d, err := detail.AsWiredNetworkClientDetail()
 				if err != nil {
 					return err
 				}
-				ip := ""
-				if d.Ip != nil {
-					ip = *d.Ip
-				}
-				rows = [][]string{
-					{"ID", d.Id},
-					{"NAME", d.Name},
-					{"MAC", d.Mac},
-					{"IP", ip},
-					{"CONNECTION", string(d.ConnectionType)},
-					{"STATUS", string(d.Status)},
-					{"SWITCH", d.ConnectedTo.Device.Name},
-				}
-				if d.ConnectedTo.Port != nil {
-					rows = append(rows, []string{"PORT", fmt.Sprintf("%d", *d.ConnectedTo.Port)})
-				}
-				if d.ConnectedTo.LinkSpeed != nil {
-					rows = append(rows, []string{"LINK SPEED", output.FormatLinkSpeed(string(*d.ConnectedTo.LinkSpeed))})
-				}
-				if d.Uptime != nil {
-					rows = append(rows, []string{"UPTIME", output.FormatUptime(*d.Uptime)})
-				}
+				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "clients_get_wired.tmpl", d)
+
 			case "wireless":
 				d, err := detail.AsWirelessNetworkClientDetail()
 				if err != nil {
 					return err
 				}
-				ip := ""
-				if d.Ip != nil {
-					ip = *d.Ip
-				}
-				rows = [][]string{
-					{"ID", d.Id},
-					{"NAME", d.Name},
-					{"MAC", d.Mac},
-					{"IP", ip},
-					{"CONNECTION", string(d.ConnectionType)},
-					{"STATUS", string(d.Status)},
-					{"AP", d.ConnectedTo.Device.Name},
-					{"SSID", d.ConnectedTo.Ssid},
-				}
-				if d.ConnectedTo.SignalStrength != nil {
-					rows = append(rows, []string{"SIGNAL", fmt.Sprintf("%d dBm", *d.ConnectedTo.SignalStrength)})
-				}
-				if d.Uptime != nil {
-					rows = append(rows, []string{"UPTIME", output.FormatUptime(*d.Uptime)})
-				}
+				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "clients_get_wireless.tmpl", d)
+
 			default:
 				return fmt.Errorf("unknown connection type: %s", disc)
 			}
-
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
 		},
 	}
 }
