@@ -1,0 +1,7 @@
+{{ template "deviceBase" . }}
+{{ flush }}
+--- PORTS ---
+PORT	STATE	SPEED	POE	POE WATTS	RX	TX	CONNECTED TO
+{{ range .Ports -}}
+{{ .Number }}	{{ .State }}	{{ if and (eq (string .State) "up") .LinkSpeed }}{{ formatLinkSpeed (derefStr .LinkSpeed) }}{{ else }}-{{ end }}	{{ .PoeMode }}	{{ if .PoePowerWatts }}{{ printf "%.1f W" (derefFloat .PoePowerWatts) }}{{ else }}-{{ end }}	{{ formatBytesPerSec .Traffic.RxBytesPerSec }}	{{ formatBytesPerSec .Traffic.TxBytesPerSec }}	{{ .ConnectedToName }}
+{{ end -}}
