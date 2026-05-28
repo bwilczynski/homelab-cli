@@ -10,6 +10,7 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/bwilczynski/hlctl/internal/output"
 	gen "github.com/bwilczynski/hlctl/internal/system"
 	"github.com/spf13/cobra"
@@ -163,63 +164,64 @@ func newUtilizationCmd(client SystemClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "utilization",
 		Short: "Show live resource utilization",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			params := &gen.ListSystemUtilizationParams{}
-			if device != "" {
-				params.Device = &device
-			}
-
-			resp, err := c.ListSystemUtilization(context.Background(), params)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.SystemUtilizationList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
-				return nil
-			}
-
-			headers := []string{"DEVICE", "CPU", "MEMORY", "SWAP"}
-			var rows [][]string
-			for _, u := range list.Items {
-				swapPct := 0
-				if u.Memory.SwapTotalBytes > 0 {
-					swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
-				}
-				rows = append(rows, []string{
-					u.Device,
-					fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
-					fmt.Sprintf("%d%%", u.Memory.UsedPercent),
-					fmt.Sprintf("%d%%", swapPct),
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
-		},
 	}
+	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+		c := client
+		if c == nil {
+			var err error
+			c, err = buildClient()
+			if err != nil {
+				return err
+			}
+		}
+
+		params := &gen.ListSystemUtilizationParams{}
+		if device != "" {
+			params.Device = &device
+		}
+
+		resp, err := c.ListSystemUtilization(ctx, params)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return apiclient.ParseError(resp)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		var list gen.SystemUtilizationList
+		if err := json.Unmarshal(body, &list); err != nil {
+			return err
+		}
+
+		if flags.GetOutputFormat() == output.FormatJSON {
+			fmt.Fprint(w, string(body))
+			return nil
+		}
+
+		headers := []string{"DEVICE", "CPU", "MEMORY", "SWAP"}
+		var rows [][]string
+		for _, u := range list.Items {
+			swapPct := 0
+			if u.Memory.SwapTotalBytes > 0 {
+				swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
+			}
+			rows = append(rows, []string{
+				u.Device,
+				fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
+				fmt.Sprintf("%d%%", u.Memory.UsedPercent),
+				fmt.Sprintf("%d%%", swapPct),
+			})
+		}
+		return output.Print(w, flags.GetOutputFormat(), list, headers, rows)
+	})
 
 	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
+	watch.RegisterFlags(cmd)
 	return cmd
 }
 

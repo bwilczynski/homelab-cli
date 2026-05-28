@@ -11,6 +11,7 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	gen "github.com/bwilczynski/hlctl/internal/docker"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
@@ -54,60 +55,61 @@ func newListCmd(client DockerClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List containers",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			params := &gen.ListContainersParams{}
-			if device != "" {
-				params.Device = &device
-			}
-
-			resp, err := c.ListContainers(context.Background(), params)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.ContainerList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
-				return nil
-			}
-
-			headers := []string{"ID", "IMAGE", "STATUS", "CPU", "MEMORY"}
-			var rows [][]string
-			for _, c := range list.Items {
-				rows = append(rows, []string{
-					c.Id,
-					c.Image,
-					string(c.Status),
-					fmt.Sprintf("%.1f%%", c.Resources.CpuPercent),
-					output.FormatBytes(c.Resources.MemoryBytes),
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
-		},
 	}
+	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+		c := client
+		if c == nil {
+			var err error
+			c, err = buildClient()
+			if err != nil {
+				return err
+			}
+		}
+
+		params := &gen.ListContainersParams{}
+		if device != "" {
+			params.Device = &device
+		}
+
+		resp, err := c.ListContainers(ctx, params)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return apiclient.ParseError(resp)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		var list gen.ContainerList
+		if err := json.Unmarshal(body, &list); err != nil {
+			return err
+		}
+
+		if flags.GetOutputFormat() == output.FormatJSON {
+			fmt.Fprint(w, string(body))
+			return nil
+		}
+
+		headers := []string{"ID", "IMAGE", "STATUS", "CPU", "MEMORY"}
+		var rows [][]string
+		for _, c := range list.Items {
+			rows = append(rows, []string{
+				c.Id,
+				c.Image,
+				string(c.Status),
+				fmt.Sprintf("%.1f%%", c.Resources.CpuPercent),
+				output.FormatBytes(c.Resources.MemoryBytes),
+			})
+		}
+		return output.Print(w, flags.GetOutputFormat(), list, headers, rows)
+	})
 
 	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
+	watch.RegisterFlags(cmd)
 	return cmd
 }
 

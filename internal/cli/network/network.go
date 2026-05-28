@@ -9,6 +9,7 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	gen "github.com/bwilczynski/hlctl/internal/network"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
@@ -290,62 +291,63 @@ func newListClientsCmd(client NetworkClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List network clients",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			params := &gen.ListNetworkClientsParams{}
-			if statusFilter != "" {
-				s := gen.NetworkClientStatus(statusFilter)
-				params.Status = &s
-			}
-
-			resp, err := c.ListNetworkClients(context.Background(), params)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.NetworkClientList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
-				return nil
-			}
-
-			headers := []string{"ID", "NAME", "MAC", "IP", "STATUS", "CONNECTION"}
-			var rows [][]string
-			for _, cl := range list.Items {
-				ip := ""
-				if cl.Ip != nil {
-					ip = *cl.Ip
-				}
-				rows = append(rows, []string{
-					cl.Id, cl.Name, cl.Mac, ip,
-					string(cl.Status),
-					string(cl.ConnectionType),
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
-		},
 	}
+	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+		c := client
+		if c == nil {
+			var err error
+			c, err = buildClient()
+			if err != nil {
+				return err
+			}
+		}
+
+		params := &gen.ListNetworkClientsParams{}
+		if statusFilter != "" {
+			s := gen.NetworkClientStatus(statusFilter)
+			params.Status = &s
+		}
+
+		resp, err := c.ListNetworkClients(ctx, params)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return apiclient.ParseError(resp)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		var list gen.NetworkClientList
+		if err := json.Unmarshal(body, &list); err != nil {
+			return err
+		}
+
+		if flags.GetOutputFormat() == output.FormatJSON {
+			fmt.Fprint(w, string(body))
+			return nil
+		}
+
+		headers := []string{"ID", "NAME", "MAC", "IP", "STATUS", "CONNECTION"}
+		var rows [][]string
+		for _, cl := range list.Items {
+			ip := ""
+			if cl.Ip != nil {
+				ip = *cl.Ip
+			}
+			rows = append(rows, []string{
+				cl.Id, cl.Name, cl.Mac, ip,
+				string(cl.Status),
+				string(cl.ConnectionType),
+			})
+		}
+		return output.Print(w, flags.GetOutputFormat(), list, headers, rows)
+	})
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
+	watch.RegisterFlags(cmd)
 	return cmd
 }
 
@@ -470,52 +472,53 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "topology",
 		Short: "Show network topology",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			params := &gen.GetNetworkTopologyParams{}
-			if includeClients || includeWireless {
-				t := true
-				params.IncludeClients = &t
-			}
-
-			resp, err := c.GetNetworkTopology(context.Background(), params)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
-				return nil
-			}
-
-			var topo gen.NetworkTopology
-			if err := json.Unmarshal(body, &topo); err != nil {
-				return err
-			}
-
-			return printTopologyTree(cmd.OutOrStdout(), topo, includeWireless)
-		},
 	}
+	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+		c := client
+		if c == nil {
+			var err error
+			c, err = buildClient()
+			if err != nil {
+				return err
+			}
+		}
+
+		params := &gen.GetNetworkTopologyParams{}
+		if includeClients || includeWireless {
+			t := true
+			params.IncludeClients = &t
+		}
+
+		resp, err := c.GetNetworkTopology(ctx, params)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return apiclient.ParseError(resp)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+
+		if flags.GetOutputFormat() == output.FormatJSON {
+			fmt.Fprint(w, string(body))
+			return nil
+		}
+
+		var topo gen.NetworkTopology
+		if err := json.Unmarshal(body, &topo); err != nil {
+			return err
+		}
+
+		return printTopologyTree(w, topo, includeWireless)
+	})
 
 	cmd.Flags().BoolVar(&includeClients, "include-clients", false, "Include wired clients in the topology")
 	cmd.Flags().BoolVar(&includeWireless, "include-wireless", false, "Also include wireless clients (implies --include-clients)")
+	watch.RegisterFlags(cmd)
 	return cmd
 }
 
