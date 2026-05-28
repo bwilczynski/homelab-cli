@@ -158,9 +158,12 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 				if rv.IsNil() {
 					return ""
 				}
-				return fmt.Sprintf("%s", rv.Elem().Interface())
+				rv = rv.Elem()
 			}
-			return fmt.Sprintf("%s", v)
+			if rv.Kind() == reflect.String {
+				return rv.String()
+			}
+			return fmt.Sprintf("%v", rv.Interface())
 		},
 		"derefInt": func(v any) int {
 			if v == nil {
@@ -197,7 +200,11 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 			return 0
 		},
 		"string": func(v any) string {
-			return fmt.Sprintf("%s", v)
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.String {
+				return rv.String()
+			}
+			return fmt.Sprintf("%v", v)
 		},
 		"formatBands": func(bands any) string {
 			rv := reflect.ValueOf(bands)
@@ -206,7 +213,14 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 			}
 			parts := make([]string, 0, rv.Len())
 			for i := 0; i < rv.Len(); i++ {
-				switch fmt.Sprintf("%s", rv.Index(i).Interface()) {
+				elem := rv.Index(i)
+				var s string
+				if elem.Kind() == reflect.String {
+					s = elem.String()
+				} else {
+					s = fmt.Sprintf("%v", elem.Interface())
+				}
+				switch s {
 				case "band2g":
 					parts = append(parts, "2.4 GHz")
 				case "band5g":
@@ -214,7 +228,7 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 				case "band6g":
 					parts = append(parts, "6 GHz")
 				default:
-					parts = append(parts, fmt.Sprintf("%s", rv.Index(i).Interface()))
+					parts = append(parts, s)
 				}
 			}
 			return strings.Join(parts, ", ")

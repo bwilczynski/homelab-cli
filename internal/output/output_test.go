@@ -147,6 +147,47 @@ func TestRenderTemplate_formatFuncs(t *testing.T) {
 	}
 }
 
+func TestRenderTemplate_derefHelpers(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte("{{ derefInt .IntPtr }}\n{{ derefFloat .FloatPtr }}\n{{ derefInt .NilInt }}\n{{ derefFloat .NilFloat }}")},
+	}
+	i := 42
+	f := float32(3.14)
+	type data struct {
+		IntPtr   *int
+		FloatPtr *float32
+		NilInt   *int
+		NilFloat *float32
+	}
+
+	var buf bytes.Buffer
+	err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{IntPtr: &i, FloatPtr: &f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "42") {
+		t.Errorf("expected 42 in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "3.14") {
+		// float32 3.14 may render as 3.1400001 due to precision; just check it has something
+		if !strings.Contains(out, "3.1") {
+			t.Errorf("expected ~3.14 in output, got:\n%s", out)
+		}
+	}
+	// nil pointers produce 0
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) < 4 {
+		t.Fatalf("expected 4 lines, got %d", len(lines))
+	}
+	if strings.TrimSpace(lines[2]) != "0" {
+		t.Errorf("expected 0 for nil int, got %q", lines[2])
+	}
+	if strings.TrimSpace(lines[3]) != "0" {
+		t.Errorf("expected 0 for nil float, got %q", lines[3])
+	}
+}
+
 func TestRenderTemplate_unknownTemplate(t *testing.T) {
 	fsys := fstest.MapFS{
 		"a.tmpl": &fstest.MapFile{Data: []byte("hello")},
