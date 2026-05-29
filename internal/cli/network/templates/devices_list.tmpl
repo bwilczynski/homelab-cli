@@ -1,0 +1,4 @@
+ID	NAME	MAC	IP	TYPE	STATUS
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .Mac }}	{{ .Ip }}	{{ .Type }}	{{ .Status }}
+{{ end -}}

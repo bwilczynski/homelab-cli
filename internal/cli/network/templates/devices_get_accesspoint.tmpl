@@ -1,0 +1,7 @@
+{{ template "deviceBase" . }}
+{{ flush }}
+--- CLIENTS ---
+CLIENT	SSID	SIGNAL
+{{ range .ConnectedClients -}}
+{{ .Client.Name }}	{{ .Ssid }}	{{ .SignalStrength }} dBm
+{{ end -}}

@@ -1,0 +1,19 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+VLAN ID	{{ .VlanId }}
+BANDS	{{ formatBands .Bands }}
+CLIENTS	{{ .NumClients }}
+SECURITY	{{ .SecurityProtocol }}
+{{ flush }}
+--- CLIENTS ---
+NAME
+{{ range .Clients -}}
+{{ .Name }}
+{{ end -}}
+{{ flush }}
+--- BROADCASTING APs ---
+NAME
+{{ range .BroadcastingAps -}}
+{{ .Name }}
+{{ end -}}

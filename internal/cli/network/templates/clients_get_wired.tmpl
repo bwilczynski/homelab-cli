@@ -1,0 +1,17 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+MAC	{{ .Mac }}
+IP	{{ derefStr .Ip }}
+CONNECTION	{{ .ConnectionType }}
+STATUS	{{ .Status }}
+SWITCH	{{ .ConnectedTo.Device.Name }}
+{{- if .ConnectedTo.Port }}
+PORT	{{ derefInt .ConnectedTo.Port }}
+{{- end }}
+{{- if .ConnectedTo.LinkSpeed }}
+LINK SPEED	{{ formatLinkSpeed (derefStr .ConnectedTo.LinkSpeed) }}
+{{- end }}
+{{- if .Uptime }}
+UPTIME	{{ formatUptime (derefInt .Uptime) }}
+{{- end }}

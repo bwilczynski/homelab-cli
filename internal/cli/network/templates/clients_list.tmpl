@@ -1,0 +1,4 @@
+ID	NAME	MAC	IP	STATUS	CONNECTION
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .Mac }}	{{ derefStr .Ip }}	{{ .Status }}	{{ .ConnectionType }}
+{{ end -}}

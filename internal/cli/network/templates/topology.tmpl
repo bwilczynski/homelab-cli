@@ -1,0 +1,10 @@
+{{ .GatewayDisplay }}
+{{- template "subtree" dict "ParentID" .GatewayID "Adjacency" .Adjacency "Prefix" "" }}
+{{- define "subtree" }}
+{{- $children := index .Adjacency .ParentID }}
+{{- range $i, $child := $children }}
+{{- $last := isLast $i $children }}
+{{ $.Prefix }}{{ connector $last }}{{ $child.Display }}{{ if $child.EdgeDisp }} {{ $child.EdgeDisp }}{{ end }}
+{{- template "subtree" dict "ParentID" $child.ID "Adjacency" $.Adjacency "Prefix" (childPrefix $.Prefix $last) }}
+{{- end }}
+{{- end }}

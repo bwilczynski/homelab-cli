@@ -1,0 +1,18 @@
+{{- define "deviceBase" -}}
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+MAC	{{ .Mac }}
+IP	{{ .Ip }}
+TYPE	{{ string .Type }}
+STATUS	{{ string .Status }}
+MODEL	{{ .Model }}
+FIRMWARE	{{ .FirmwareVersion }}
+UPTIME	{{ formatUptime .Uptime }}
+TRAFFIC RX	{{ formatBytesPerSec .Traffic.RxBytesPerSec }} ({{ formatBytes .Traffic.RxBytesTotal }} total)
+TRAFFIC TX	{{ formatBytesPerSec .Traffic.TxBytesPerSec }} ({{ formatBytes .Traffic.TxBytesTotal }} total)
+{{- if .Uplink }}
+{{- $ul := .Uplink }}
+UPLINK	{{ $ul.Device.Name }}{{ if $ul.Port }} (port {{ derefInt $ul.Port }}{{ if $ul.LinkSpeed }}, {{ formatLinkSpeed (derefStr $ul.LinkSpeed) }}{{ end }}){{ end }}
+{{- end }}
+{{- end }}

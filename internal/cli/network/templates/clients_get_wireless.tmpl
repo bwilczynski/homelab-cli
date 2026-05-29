@@ -1,0 +1,15 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+MAC	{{ .Mac }}
+IP	{{ derefStr .Ip }}
+CONNECTION	{{ .ConnectionType }}
+STATUS	{{ .Status }}
+AP	{{ .ConnectedTo.Device.Name }}
+SSID	{{ .ConnectedTo.Ssid }}
+{{- if .ConnectedTo.SignalStrength }}
+SIGNAL	{{ derefInt .ConnectedTo.SignalStrength }} dBm
+{{- end }}
+{{- if .Uptime }}
+UPTIME	{{ formatUptime (derefInt .Uptime) }}
+{{- end }}

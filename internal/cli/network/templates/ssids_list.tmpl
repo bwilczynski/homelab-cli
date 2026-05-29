@@ -1,0 +1,4 @@
+ID	NAME	VLAN ID	BANDS	CLIENTS
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .VlanId }}	{{ formatBands .Bands }}	{{ .NumClients }}
+{{ end -}}

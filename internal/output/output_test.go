@@ -1,7 +1,10 @@
 package output_test
 
 import (
+	"bytes"
+	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/bwilczynski/hlctl/internal/output"
 )
@@ -94,5 +97,119 @@ func TestFormatLinkSpeed(t *testing.T) {
 				t.Errorf("FormatLinkSpeed(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestRenderTemplate_list(t *testing.T) {
+	fsys := fstest.MapFS{
+		"list.tmpl": &fstest.MapFile{Data: []byte("NAME\tCOUNT\n{{ range .Items }}{{ .Name }}\t{{ .Count }}\n{{ end }}")},
+	}
+	type row struct {
+		Name  string
+		Count int
+	}
+	type data struct{ Items []row }
+
+	var buf bytes.Buffer
+	err := output.RenderTemplate(&buf, fsys, "list.tmpl", data{Items: []row{{"foo", 1}, {"bar", 2}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"NAME", "COUNT", "foo", "bar"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderTemplate_formatFuncs(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte("{{ formatUptime .Uptime }}\n{{ formatBands .Bands }}\n{{ derefStr .Ptr }}")},
+	}
+	ptr := "hello"
+	type data struct {
+		Uptime int
+		Bands  []string
+		Ptr    *string
+	}
+
+	var buf bytes.Buffer
+	err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{Uptime: 86400, Bands: []string{"band2g", "band5g"}, Ptr: &ptr})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"1d", "2.4 GHz", "5 GHz", "hello"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderTemplate_derefHelpers(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte("{{ derefInt .IntPtr }}\n{{ derefFloat .FloatPtr }}\n{{ derefInt .NilInt }}\n{{ derefFloat .NilFloat }}")},
+	}
+	i := 42
+	f := float32(3.14)
+	type data struct {
+		IntPtr   *int
+		FloatPtr *float32
+		NilInt   *int
+		NilFloat *float32
+	}
+
+	var buf bytes.Buffer
+	err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{IntPtr: &i, FloatPtr: &f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "42") {
+		t.Errorf("expected 42 in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "3.14") {
+		// float32 3.14 may render as 3.1400001 due to precision; just check it has something
+		if !strings.Contains(out, "3.1") {
+			t.Errorf("expected ~3.14 in output, got:\n%s", out)
+		}
+	}
+	// nil pointers produce 0
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) < 4 {
+		t.Fatalf("expected 4 lines, got %d", len(lines))
+	}
+	if strings.TrimSpace(lines[2]) != "0" {
+		t.Errorf("expected 0 for nil int, got %q", lines[2])
+	}
+	if strings.TrimSpace(lines[3]) != "0" {
+		t.Errorf("expected 0 for nil float, got %q", lines[3])
+	}
+}
+
+func TestRenderTemplate_unknownTemplate(t *testing.T) {
+	fsys := fstest.MapFS{
+		"a.tmpl": &fstest.MapFile{Data: []byte("hello")},
+	}
+	err := output.RenderTemplate(&bytes.Buffer{}, fsys, "missing.tmpl", nil)
+	if err == nil {
+		t.Fatal("expected error for missing template name")
+	}
+}
+
+func TestRenderTemplate_flush(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte("A\tB\nfoo\tbar\n{{ flush }}\nC\tD\nbaz\tqux\n")},
+	}
+	var buf bytes.Buffer
+	if err := output.RenderTemplate(&buf, fsys, "t.tmpl", nil); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"A", "B", "foo", "bar", "C", "D", "baz", "qux"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
 	}
 }

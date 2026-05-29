@@ -1,0 +1,7 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+IP	{{ .IpAddress }}
+UPTIME	{{ formatUptime .Uptime }}
+STATUS	{{ .Status }}
+DNS	{{ join .DnsServers ", " }}

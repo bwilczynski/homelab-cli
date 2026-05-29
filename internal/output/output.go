@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
+	"reflect"
 	"strings"
 	"text/tabwriter"
+	"text/template"
 	"time"
 )
 
@@ -131,4 +134,134 @@ func FormatUptime(seconds int) string {
 		}
 	}
 	return strings.Join(parts, " ")
+}
+
+func derefOrZero[T any](v *T) T {
+	if v == nil {
+		var zero T
+		return zero
+	}
+	return *v
+}
+
+// RenderTemplate executes the named template from fsys into w, with a tabwriter
+// for column alignment. Call {{ flush }} in the template between independent
+// table sections to reset column-width tracking.
+//
+// The template set is re-parsed on every call because the flush func must close
+// over the per-call tabwriter — caching the parsed template would prevent this.
+func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+
+	funcMap := template.FuncMap{
+		"formatUptime":      FormatUptime,
+		"formatBytes":       FormatBytes,
+		"formatBytesPerSec": FormatBytesPerSec,
+		"formatLinkSpeed":   FormatLinkSpeed,
+		"formatTime":        FormatTime,
+		"join":              strings.Join,
+		"derefStr": func(v any) string {
+			if v == nil {
+				return ""
+			}
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.Pointer {
+				if rv.IsNil() {
+					return ""
+				}
+				rv = rv.Elem()
+			}
+			if rv.Kind() == reflect.String {
+				return rv.String()
+			}
+			return fmt.Sprintf("%v", rv.Interface())
+		},
+		"derefInt":   derefOrZero[int],
+		"derefFloat": derefOrZero[float32],
+		"string": func(v any) string {
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.String {
+				return rv.String()
+			}
+			return fmt.Sprintf("%v", v)
+		},
+		"formatBands": func(bands any) string {
+			rv := reflect.ValueOf(bands)
+			if rv.Kind() != reflect.Slice {
+				return ""
+			}
+			parts := make([]string, 0, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				elem := rv.Index(i)
+				var s string
+				if elem.Kind() == reflect.String {
+					s = elem.String()
+				} else {
+					s = fmt.Sprintf("%v", elem.Interface())
+				}
+				switch s {
+				case "band2g":
+					parts = append(parts, "2.4 GHz")
+				case "band5g":
+					parts = append(parts, "5 GHz")
+				case "band6g":
+					parts = append(parts, "6 GHz")
+				default:
+					parts = append(parts, s)
+				}
+			}
+			return strings.Join(parts, ", ")
+		},
+		"dict": func(args ...any) (map[string]any, error) {
+			if len(args)%2 != 0 {
+				return nil, fmt.Errorf("dict requires an even number of arguments")
+			}
+			m := make(map[string]any, len(args)/2)
+			for i := 0; i < len(args); i += 2 {
+				k, ok := args[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict keys must be strings")
+				}
+				m[k] = args[i+1]
+			}
+			return m, nil
+		},
+		"isLast": func(i int, slice any) bool {
+			rv := reflect.ValueOf(slice)
+			if rv.Kind() != reflect.Slice {
+				return false
+			}
+			return i == rv.Len()-1
+		},
+		"connector": func(isLast bool) string {
+			if isLast {
+				return "└── "
+			}
+			return "├── "
+		},
+		"childPrefix": func(prefix string, isLast bool) string {
+			if isLast {
+				return prefix + "    "
+			}
+			return prefix + "│   "
+		},
+		"flush": func() (string, error) {
+			return "", tw.Flush()
+		},
+	}
+
+	tmpl, err := template.New("").Funcs(funcMap).ParseFS(fsys, "*.tmpl")
+	if err != nil {
+		return err
+	}
+
+	t := tmpl.Lookup(name)
+	if t == nil {
+		return fmt.Errorf("template %q not found", name)
+	}
+
+	if err := t.Execute(tw, data); err != nil {
+		return err
+	}
+	return tw.Flush()
 }
