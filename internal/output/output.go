@@ -157,7 +157,7 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 				return ""
 			}
 			rv := reflect.ValueOf(v)
-			if rv.Kind() == reflect.Ptr {
+			if rv.Kind() == reflect.Pointer {
 				if rv.IsNil() {
 					return ""
 				}
@@ -173,7 +173,7 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 				return 0
 			}
 			rv := reflect.ValueOf(v)
-			if rv.Kind() == reflect.Ptr {
+			if rv.Kind() == reflect.Pointer {
 				if rv.IsNil() {
 					return 0
 				}
@@ -190,7 +190,7 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 				return 0
 			}
 			rv := reflect.ValueOf(v)
-			if rv.Kind() == reflect.Ptr {
+			if rv.Kind() == reflect.Pointer {
 				if rv.IsNil() {
 					return 0
 				}
