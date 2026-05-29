@@ -77,7 +77,7 @@ func newListCmd(client DockerClient) *cobra.Command {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseError(resp)
+			return apiclient.ParseErrorResponse(resp)
 		}
 
 		body, err := io.ReadAll(resp.Body)
@@ -134,7 +134,7 @@ func newGetCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -291,7 +291,7 @@ func newStartCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusNoContent {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Container %s started\n", args[0])
 			return nil
@@ -319,7 +319,7 @@ func newStopCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusNoContent {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Container %s stopped\n", args[0])
 			return nil
@@ -347,7 +347,7 @@ func newRestartCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusNoContent {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Container %s restarted\n", args[0])
 			return nil
@@ -392,7 +392,7 @@ func newListNetworksCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -446,7 +446,7 @@ func newGetNetworkCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -542,7 +542,7 @@ func newListImagesCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -599,7 +599,7 @@ func newGetImageCmd(client DockerClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)

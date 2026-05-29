@@ -44,7 +44,7 @@ func newListWansCmd(client NetworkClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -88,7 +88,7 @@ func newGetWanCmd(client NetworkClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)

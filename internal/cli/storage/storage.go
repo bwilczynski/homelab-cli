@@ -69,7 +69,7 @@ func newListVolumesCmd(client StorageClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -125,7 +125,7 @@ func newGetVolumeCmd(client StorageClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -225,7 +225,7 @@ func newListBackupsCmd(client StorageClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -279,7 +279,7 @@ func newGetBackupCmd(client StorageClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)

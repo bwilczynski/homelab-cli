@@ -68,7 +68,7 @@ func newHealthCmd(client SystemClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -122,7 +122,7 @@ func newInfoCmd(client SystemClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -186,7 +186,7 @@ func newUtilizationCmd(client SystemClient) *cobra.Command {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseError(resp)
+			return apiclient.ParseErrorResponse(resp)
 		}
 
 		body, err := io.ReadAll(resp.Body)
@@ -257,7 +257,7 @@ func newListUpdatesCmd(client SystemClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -317,7 +317,7 @@ func newGetUpdateCmd(client SystemClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -388,7 +388,7 @@ func newCheckUpdatesCmd(client SystemClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)

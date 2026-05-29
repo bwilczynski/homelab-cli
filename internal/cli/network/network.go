@@ -80,7 +80,7 @@ func newListDevicesCmd(client NetworkClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -124,7 +124,7 @@ func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -251,7 +251,7 @@ func newListClientsCmd(client NetworkClient) *cobra.Command {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseError(resp)
+			return apiclient.ParseErrorResponse(resp)
 		}
 
 		body, err := io.ReadAll(resp.Body)
@@ -296,7 +296,7 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
+				return apiclient.ParseErrorResponse(resp)
 			}
 
 			body, err := io.ReadAll(resp.Body)
@@ -382,7 +382,7 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseError(resp)
+			return apiclient.ParseErrorResponse(resp)
 		}
 
 		body, err := io.ReadAll(resp.Body)
