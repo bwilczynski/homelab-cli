@@ -136,6 +136,14 @@ func FormatUptime(seconds int) string {
 	return strings.Join(parts, " ")
 }
 
+func derefOrZero[T any](v *T) T {
+	if v == nil {
+		var zero T
+		return zero
+	}
+	return *v
+}
+
 // RenderTemplate executes the named template from fsys into w, with a tabwriter
 // for column alignment. Call {{ flush }} in the template between independent
 // table sections to reset column-width tracking.
@@ -168,40 +176,8 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 			}
 			return fmt.Sprintf("%v", rv.Interface())
 		},
-		"derefInt": func(v any) int {
-			if v == nil {
-				return 0
-			}
-			rv := reflect.ValueOf(v)
-			if rv.Kind() == reflect.Pointer {
-				if rv.IsNil() {
-					return 0
-				}
-				rv = rv.Elem()
-			}
-			switch rv.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				return int(rv.Int())
-			}
-			return 0
-		},
-		"derefFloat": func(v any) float64 {
-			if v == nil {
-				return 0
-			}
-			rv := reflect.ValueOf(v)
-			if rv.Kind() == reflect.Pointer {
-				if rv.IsNil() {
-					return 0
-				}
-				rv = rv.Elem()
-			}
-			switch rv.Kind() {
-			case reflect.Float32, reflect.Float64:
-				return rv.Float()
-			}
-			return 0
-		},
+		"derefInt":   derefOrZero[int],
+		"derefFloat": derefOrZero[float32],
 		"string": func(v any) string {
 			rv := reflect.ValueOf(v)
 			if rv.Kind() == reflect.String {
