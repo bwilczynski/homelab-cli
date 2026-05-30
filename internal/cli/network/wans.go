@@ -2,14 +2,11 @@ package network
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	gen "github.com/bwilczynski/hlctl/internal/network"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -38,31 +35,20 @@ func newListWansCmd(client NetworkClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.ListWans(context.Background())
+			resp, err := c.ListWansWithResponse(context.Background())
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			var list gen.WanList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "wans_list.tmpl", list)
+			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "wans_list.tmpl", *resp.JSON200)
 		},
 	}
 }
@@ -82,31 +68,20 @@ func newGetWanCmd(client NetworkClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetWan(context.Background(), args[0])
+			resp, err := c.GetWanWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			var detail gen.WanDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "wans_get.tmpl", detail)
+			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "wans_get.tmpl", *resp.JSON200)
 		},
 	}
 }

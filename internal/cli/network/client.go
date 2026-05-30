@@ -8,22 +8,21 @@ import (
 )
 
 // NetworkClient is the interface used by network commands.
-// It matches the subset of gen.ClientInterface that network commands need.
 type NetworkClient interface {
-	ListNetworkDevices(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	GetNetworkDevice(ctx context.Context, deviceId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	ListNetworkClients(ctx context.Context, params *gen.ListNetworkClientsParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	GetNetworkClient(ctx context.Context, clientId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	GetNetworkTopology(ctx context.Context, params *gen.GetNetworkTopologyParams, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	ListVlans(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	GetVlan(ctx context.Context, vlanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	ListSsids(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	GetSsid(ctx context.Context, ssidId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	ListWans(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
-	GetWan(ctx context.Context, wanId string, reqEditors ...gen.RequestEditorFn) (*http.Response, error)
+	ListNetworkDevicesWithResponse(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*gen.ListNetworkDevicesResponse, error)
+	GetNetworkDeviceWithResponse(ctx context.Context, deviceId string, reqEditors ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error)
+	ListNetworkClientsWithResponse(ctx context.Context, params *gen.ListNetworkClientsParams, reqEditors ...gen.RequestEditorFn) (*gen.ListNetworkClientsResponse, error)
+	GetNetworkClientWithResponse(ctx context.Context, clientId string, reqEditors ...gen.RequestEditorFn) (*gen.GetNetworkClientResponse, error)
+	GetNetworkTopologyWithResponse(ctx context.Context, params *gen.GetNetworkTopologyParams, reqEditors ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error)
+	ListVlansWithResponse(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*gen.ListVlansResponse, error)
+	GetVlanWithResponse(ctx context.Context, vlanId string, reqEditors ...gen.RequestEditorFn) (*gen.GetVlanResponse, error)
+	ListSsidsWithResponse(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*gen.ListSsidsResponse, error)
+	GetSsidWithResponse(ctx context.Context, ssidId string, reqEditors ...gen.RequestEditorFn) (*gen.GetSsidResponse, error)
+	ListWansWithResponse(ctx context.Context, reqEditors ...gen.RequestEditorFn) (*gen.ListWansResponse, error)
+	GetWanWithResponse(ctx context.Context, wanId string, reqEditors ...gen.RequestEditorFn) (*gen.GetWanResponse, error)
 }
 
 // NewNetworkClient constructs a NetworkClient backed by the real API.
 func NewNetworkClient(httpClient *http.Client, apiURL string) (NetworkClient, error) {
-	return gen.NewClient(apiURL, gen.WithHTTPClient(httpClient))
+	return gen.NewClientWithResponses(apiURL, gen.WithHTTPClient(httpClient))
 }

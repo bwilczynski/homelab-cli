@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -74,30 +73,20 @@ func newListDevicesCmd(client NetworkClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.ListNetworkDevices(context.Background())
+			resp, err := c.ListNetworkDevicesWithResponse(context.Background())
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.NetworkDeviceList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "devices_list.tmpl", list)
+			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "devices_list.tmpl", *resp.JSON200)
 		},
 	}
 }
@@ -118,28 +107,20 @@ func newGetDeviceCmd(client NetworkClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetNetworkDevice(context.Background(), args[0])
+			resp, err := c.GetNetworkDeviceWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.NetworkDeviceDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
+
+			detail := *resp.JSON200
 
 			disc, err := detail.Discriminator()
 			if err != nil {
@@ -245,30 +226,20 @@ func newListClientsCmd(client NetworkClient) *cobra.Command {
 			params.Status = &s
 		}
 
-		resp, err := c.ListNetworkClients(ctx, params)
+		resp, err := c.ListNetworkClientsWithResponse(ctx, params)
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseErrorResponse(resp)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		var list gen.NetworkClientList
-		if err := json.Unmarshal(body, &list); err != nil {
-			return err
+		if resp.StatusCode() != http.StatusOK {
+			return apiclient.ParseError(resp.StatusCode(), resp.Body)
 		}
 
 		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(body))
+			fmt.Fprint(w, string(resp.Body))
 			return nil
 		}
 
-		return output.RenderTemplate(w, networkTemplates, "clients_list.tmpl", list)
+		return output.RenderTemplate(w, networkTemplates, "clients_list.tmpl", *resp.JSON200)
 	})
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
 	watch.RegisterFlags(cmd)
@@ -290,28 +261,20 @@ func newGetClientCmd(client NetworkClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetNetworkClient(context.Background(), args[0])
+			resp, err := c.GetNetworkClientWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.NetworkClientDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
+
+			detail := *resp.JSON200
 
 			disc, err := detail.Discriminator()
 			if err != nil {
@@ -376,30 +339,20 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 			params.IncludeClients = &t
 		}
 
-		resp, err := c.GetNetworkTopology(ctx, params)
+		resp, err := c.GetNetworkTopologyWithResponse(ctx, params)
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseErrorResponse(resp)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
+		if resp.StatusCode() != http.StatusOK {
+			return apiclient.ParseError(resp.StatusCode(), resp.Body)
 		}
 
 		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(body))
+			fmt.Fprint(w, string(resp.Body))
 			return nil
 		}
 
-		var topo gen.NetworkTopology
-		if err := json.Unmarshal(body, &topo); err != nil {
-			return err
-		}
-		tree, err := buildTopologyTree(topo, includeWireless)
+		tree, err := buildTopologyTree(*resp.JSON200, includeWireless)
 		if err != nil {
 			return err
 		}
@@ -525,4 +478,3 @@ func connectionRefID(ref gen.NetworkConnectionRef) (string, error) {
 		return "", fmt.Errorf("unknown connection ref kind: %s", disc)
 	}
 }
-
