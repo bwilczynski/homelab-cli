@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 )
 
 type problem struct {
@@ -24,14 +22,4 @@ func ParseError(statusCode int, body []byte) error {
 		return fmt.Errorf("%s — %s", p.Title, *p.Detail)
 	}
 	return errors.New(p.Title)
-}
-
-// ParseErrorResponse reads an RFC 9457 Problem Details body from resp and returns
-// a user-friendly error. Deprecated: only use before WithResponse migration is complete.
-func ParseErrorResponse(resp *http.Response) error {
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("unexpected status %d", resp.StatusCode)
-	}
-	return ParseError(resp.StatusCode, body)
 }
