@@ -4,6 +4,7 @@ package system
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -12,11 +13,53 @@ import (
 	gen "github.com/bwilczynski/hlctl/internal/system"
 )
 
+func okHealthResp(data gen.Health) *gen.GetSystemHealthResponse {
+	b, _ := json.Marshal(data)
+	return &gen.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
+}
+
+func errHealthResp(status int, body map[string]any) *gen.GetSystemHealthResponse {
+	b, _ := json.Marshal(body)
+	return &gen.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okInfoResp(list gen.SystemInfoList) *gen.ListSystemInfoResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListSystemInfoResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func okUtilizationResp(list gen.SystemUtilizationList) *gen.ListSystemUtilizationResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListSystemUtilizationResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func okListUpdatesResp(list gen.SystemUpdateList) *gen.ListSystemUpdatesResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListSystemUpdatesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func okGetUpdateResp(data map[string]any) *gen.GetSystemUpdateResponse {
+	b, _ := json.Marshal(data)
+	var typed gen.SystemUpdateDetail
+	_ = json.Unmarshal(b, &typed)
+	return &gen.GetSystemUpdateResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+}
+
+func errGetUpdateResp(status int, body map[string]any) *gen.GetSystemUpdateResponse {
+	b, _ := json.Marshal(body)
+	return &gen.GetSystemUpdateResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okCheckUpdatesResp(list gen.SystemUpdateList) *gen.CheckSystemUpdatesResponse {
+	b, _ := json.Marshal(list)
+	return &gen.CheckSystemUpdatesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
 func TestHealthCmd_tableOutput(t *testing.T) {
 	msg := "disk failing"
 	stub := &StubClient{
-		GetSystemHealthFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.Health{
+		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.GetSystemHealthResponse, error) {
+			return okHealthResp(gen.Health{
 				Status:    gen.Healthy,
 				CheckedAt: time.Now(),
 				Components: []gen.ComponentHealth{
@@ -45,8 +88,8 @@ func TestHealthCmd_tableOutput(t *testing.T) {
 
 func TestHealthCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		GetSystemHealthFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusUnauthorized, map[string]any{
+		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.GetSystemHealthResponse, error) {
+			return errHealthResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
 				"status": 401,
@@ -70,8 +113,8 @@ func TestHealthCmd_apiError(t *testing.T) {
 
 func TestInfoCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListSystemInfoFunc: func(_ context.Context, _ *gen.ListSystemInfoParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.SystemInfoList{
+		ListSystemInfoWithResponseFunc: func(_ context.Context, _ *gen.ListSystemInfoParams, _ ...gen.RequestEditorFn) (*gen.ListSystemInfoResponse, error) {
+			return okInfoResp(gen.SystemInfoList{
 				Items: []gen.SystemInfo{
 					{
 						Device:        "nas-1",
@@ -103,8 +146,8 @@ func TestInfoCmd_tableOutput(t *testing.T) {
 
 func TestUtilizationCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListSystemUtilizationFunc: func(_ context.Context, _ *gen.ListSystemUtilizationParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.SystemUtilizationList{
+		ListSystemUtilizationWithResponseFunc: func(_ context.Context, _ *gen.ListSystemUtilizationParams, _ ...gen.RequestEditorFn) (*gen.ListSystemUtilizationResponse, error) {
+			return okUtilizationResp(gen.SystemUtilizationList{
 				Items: []gen.SystemUtilization{
 					{
 						Device:    "nas-1",
@@ -139,8 +182,8 @@ func TestUtilizationCmd_tableOutput(t *testing.T) {
 
 func TestListUpdatesCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListSystemUpdatesFunc: func(_ context.Context, _ *gen.ListSystemUpdatesParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.SystemUpdateList{
+		ListSystemUpdatesWithResponseFunc: func(_ context.Context, _ *gen.ListSystemUpdatesParams, _ ...gen.RequestEditorFn) (*gen.ListSystemUpdatesResponse, error) {
+			return okListUpdatesResp(gen.SystemUpdateList{
 				Items: []gen.SystemUpdate{
 					{
 						Id:             "nas-1.homeassistant",
@@ -175,20 +218,20 @@ func TestListUpdatesCmd_tableOutput(t *testing.T) {
 
 func TestGetUpdateCmd_containerType(t *testing.T) {
 	stub := &StubClient{
-		GetSystemUpdateFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.ContainerSystemUpdateDetail{
-				Id:             "nas-1.homeassistant",
-				Name:           "homeassistant",
-				Device:         "nas-1",
-				Type:           gen.ContainerSystemUpdateDetailTypeContainer,
-				Status:         gen.UpdateAvailable,
-				CurrentVersion: "2024.1.0",
-				LatestVersion:  "2024.2.0",
-				CheckedAt:      time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
-				PublishedAt:    time.Date(2026, 4, 28, 10, 0, 0, 0, time.UTC),
-				Image:          "ghcr.io/home-assistant/home-assistant",
-				Source:         "https://github.com/home-assistant/core",
-				ReleaseUrl:     "https://github.com/home-assistant/core/releases/tag/2024.2.0",
+		GetSystemUpdateWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetSystemUpdateResponse, error) {
+			return okGetUpdateResp(map[string]any{
+				"id":             "nas-1.homeassistant",
+				"name":           "homeassistant",
+				"device":         "nas-1",
+				"type":           "container",
+				"status":         "updateAvailable",
+				"currentVersion": "2024.1.0",
+				"latestVersion":  "2024.2.0",
+				"checkedAt":      time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+				"publishedAt":    time.Date(2026, 4, 28, 10, 0, 0, 0, time.UTC),
+				"image":          "ghcr.io/home-assistant/home-assistant",
+				"source":         "https://github.com/home-assistant/core",
+				"releaseUrl":     "https://github.com/home-assistant/core/releases/tag/2024.2.0",
 			}), nil
 		},
 	}
@@ -216,8 +259,8 @@ func TestGetUpdateCmd_containerType(t *testing.T) {
 
 func TestGetUpdateCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		GetSystemUpdateFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusNotFound, map[string]any{
+		GetSystemUpdateWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetSystemUpdateResponse, error) {
+			return errGetUpdateResp(http.StatusNotFound, map[string]any{
 				"type":   "https://homelab.local/problems/not-found",
 				"title":  "Not Found",
 				"status": 404,
@@ -242,8 +285,8 @@ func TestGetUpdateCmd_apiError(t *testing.T) {
 
 func TestCheckUpdatesCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		CheckSystemUpdatesFunc: func(_ context.Context, _ *gen.CheckSystemUpdatesParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.SystemUpdateList{
+		CheckSystemUpdatesWithResponseFunc: func(_ context.Context, _ *gen.CheckSystemUpdatesParams, _ ...gen.RequestEditorFn) (*gen.CheckSystemUpdatesResponse, error) {
+			return okCheckUpdatesResp(gen.SystemUpdateList{
 				Items: []gen.SystemUpdate{
 					{
 						Id:             "nas-1.homeassistant",

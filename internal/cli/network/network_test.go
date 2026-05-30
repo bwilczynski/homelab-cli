@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,10 +12,127 @@ import (
 	gen "github.com/bwilczynski/hlctl/internal/network"
 )
 
+func okDevicesResp(list gen.NetworkDeviceList) *gen.ListNetworkDevicesResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListNetworkDevicesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func errDevicesResp(status int, body map[string]any) *gen.ListNetworkDevicesResponse {
+	b, _ := json.Marshal(body)
+	return &gen.ListNetworkDevicesResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okDeviceResp(data map[string]any) *gen.GetNetworkDeviceResponse {
+	b, _ := json.Marshal(data)
+	var typed gen.NetworkDeviceDetail
+	_ = json.Unmarshal(b, &typed)
+	return &gen.GetNetworkDeviceResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+}
+
+func okClientsResp(list gen.NetworkClientList) *gen.ListNetworkClientsResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListNetworkClientsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func errClientsResp(status int, body map[string]any) *gen.ListNetworkClientsResponse {
+	b, _ := json.Marshal(body)
+	return &gen.ListNetworkClientsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okClientResp(data map[string]any) *gen.GetNetworkClientResponse {
+	b, _ := json.Marshal(data)
+	var typed gen.NetworkClientDetail
+	_ = json.Unmarshal(b, &typed)
+	return &gen.GetNetworkClientResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+}
+
+func errClientResp(status int, body map[string]any) *gen.GetNetworkClientResponse {
+	b, _ := json.Marshal(body)
+	return &gen.GetNetworkClientResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okTopologyResp(data map[string]any) *gen.GetNetworkTopologyResponse {
+	b, _ := json.Marshal(data)
+	var typed gen.NetworkTopology
+	_ = json.Unmarshal(b, &typed)
+	return &gen.GetNetworkTopologyResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+}
+
+func errTopologyResp(status int, body map[string]any) *gen.GetNetworkTopologyResponse {
+	b, _ := json.Marshal(body)
+	return &gen.GetNetworkTopologyResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okVlansResp(list gen.VlanList) *gen.ListVlansResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListVlansResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func errVlansResp(status int, body map[string]any) *gen.ListVlansResponse {
+	b, _ := json.Marshal(body)
+	return &gen.ListVlansResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okVlanResp(data map[string]any) *gen.GetVlanResponse {
+	b, _ := json.Marshal(data)
+	var typed gen.VlanDetail
+	_ = json.Unmarshal(b, &typed)
+	return &gen.GetVlanResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+}
+
+func errVlanResp(status int, body map[string]any) *gen.GetVlanResponse {
+	b, _ := json.Marshal(body)
+	return &gen.GetVlanResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okSsidsResp(list gen.SsidList) *gen.ListSsidsResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func errSsidsResp(status int, body map[string]any) *gen.ListSsidsResponse {
+	b, _ := json.Marshal(body)
+	return &gen.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okSsidResp(data map[string]any) *gen.GetSsidResponse {
+	b, _ := json.Marshal(data)
+	var typed gen.SsidDetail
+	_ = json.Unmarshal(b, &typed)
+	return &gen.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+}
+
+func errSsidResp(status int, body map[string]any) *gen.GetSsidResponse {
+	b, _ := json.Marshal(body)
+	return &gen.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okWansResp(list gen.WanList) *gen.ListWansResponse {
+	b, _ := json.Marshal(list)
+	return &gen.ListWansResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+}
+
+func errWansResp(status int, body map[string]any) *gen.ListWansResponse {
+	b, _ := json.Marshal(body)
+	return &gen.ListWansResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
+func okWanResp(data map[string]any) *gen.GetWanResponse {
+	b, _ := json.Marshal(data)
+	var typed gen.WanDetail
+	_ = json.Unmarshal(b, &typed)
+	return &gen.GetWanResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+}
+
+func errWanResp(status int, body map[string]any) *gen.GetWanResponse {
+	b, _ := json.Marshal(body)
+	return &gen.GetWanResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+}
+
 func TestListDevicesCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListNetworkDevicesFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.NetworkDeviceList{
+		ListNetworkDevicesWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListNetworkDevicesResponse, error) {
+			return okDevicesResp(gen.NetworkDeviceList{
 				Items: []gen.NetworkDevice{
 					{
 						Id:     "unifi.usg",
@@ -60,8 +178,8 @@ func TestListDevicesCmd_tableOutput(t *testing.T) {
 
 func TestListDevicesCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListNetworkDevicesFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusUnauthorized, map[string]any{
+		ListNetworkDevicesWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListNetworkDevicesResponse, error) {
+			return errDevicesResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
 				"status": 401,
@@ -84,8 +202,8 @@ func TestListDevicesCmd_apiError(t *testing.T) {
 
 func TestGetDeviceCmd_gateway(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+			return okDeviceResp(map[string]any{
 				"id": "unifi.usg", "uri": "/network/devices/unifi.usg",
 				"name": "USG", "mac": "aa:bb:cc:dd:00:01", "ip": "192.168.1.1",
 				"type": "gateway", "status": "connected",
@@ -121,8 +239,8 @@ func TestGetDeviceCmd_gateway(t *testing.T) {
 func TestListClientsCmd_tableOutput(t *testing.T) {
 	ip := "192.168.1.50"
 	stub := &StubClient{
-		ListNetworkClientsFunc: func(_ context.Context, _ *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.NetworkClientList{
+		ListNetworkClientsWithResponseFunc: func(_ context.Context, _ *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*gen.ListNetworkClientsResponse, error) {
+			return okClientsResp(gen.NetworkClientList{
 				Items: []gen.NetworkClient{
 					{
 						Id:             "unifi.aa:bb:cc:dd:ee:01",
@@ -155,8 +273,8 @@ func TestListClientsCmd_tableOutput(t *testing.T) {
 
 func TestGetClientCmd_wired(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkClientWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkClientResponse, error) {
+			return okClientResp(map[string]any{
 				"id": "unifi.aa:bb:cc:dd:ee:01", "uri": "/network/clients/unifi.aa:bb:cc:dd:ee:01",
 				"name": "laptop", "mac": "aa:bb:cc:dd:ee:01", "ip": "192.168.1.50",
 				"connectionType": "wired", "status": "online",
@@ -189,8 +307,8 @@ func TestGetClientCmd_wired(t *testing.T) {
 
 func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+			return okDeviceResp(map[string]any{
 				"id": "unifi.mystery", "uri": "/network/devices/unifi.mystery",
 				"name": "Mystery Device", "mac": "aa:bb:cc:dd:00:ff", "ip": "192.168.1.99",
 				"type": "unknown", "status": "connected",
@@ -224,8 +342,8 @@ func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 
 func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+			return okDeviceResp(map[string]any{
 				"id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr",
 				"name": "Switch Living Room", "mac": "aa:bb:cc:dd:00:10", "ip": "192.168.1.10",
 				"type": "switch", "status": "connected",
@@ -270,8 +388,8 @@ func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 
 func TestGetDeviceCmd_switch_allPorts(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+			return okDeviceResp(map[string]any{
 				"id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr",
 				"name": "Switch Living Room", "mac": "aa:bb:cc:dd:00:10", "ip": "192.168.1.10",
 				"type": "switch", "status": "connected",
@@ -303,8 +421,8 @@ func TestGetDeviceCmd_switch_allPorts(t *testing.T) {
 
 func TestGetDeviceCmd_accessPoint(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+			return okDeviceResp(map[string]any{
 				"id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room",
 				"name": "AP Living Room", "mac": "aa:bb:cc:dd:00:03", "ip": "192.168.1.3",
 				"type": "accessPoint", "status": "connected",
@@ -341,8 +459,8 @@ func TestGetDeviceCmd_accessPoint(t *testing.T) {
 
 func TestGetClientCmd_wireless(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkClientWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkClientResponse, error) {
+			return okClientResp(map[string]any{
 				"id": "unifi.aa:bb:cc:dd:ee:02", "uri": "/network/clients/unifi.aa:bb:cc:dd:ee:02",
 				"name": "phone", "mac": "aa:bb:cc:dd:ee:02", "ip": "192.168.1.51",
 				"connectionType": "wireless", "status": "online",
@@ -375,8 +493,8 @@ func TestGetClientCmd_wireless(t *testing.T) {
 
 func TestGetClientCmd_offline_wired(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkClientWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkClientResponse, error) {
+			return okClientResp(map[string]any{
 				"id": "unifi.aa:bb:cc:dd:ee:03", "uri": "/network/clients/unifi.aa:bb:cc:dd:ee:03",
 				"name": "printer", "mac": "aa:bb:cc:dd:ee:03", "ip": "192.168.1.60",
 				"connectionType": "wired", "status": "offline",
@@ -409,8 +527,8 @@ func TestGetClientCmd_offline_wired(t *testing.T) {
 
 func TestGetClientCmd_offline_wireless(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkClientWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkClientResponse, error) {
+			return okClientResp(map[string]any{
 				"id": "unifi.aa:bb:cc:dd:ee:04", "uri": "/network/clients/unifi.aa:bb:cc:dd:ee:04",
 				"name": "tablet", "mac": "aa:bb:cc:dd:ee:04", "ip": "192.168.1.70",
 				"connectionType": "wireless", "status": "offline",
@@ -444,8 +562,8 @@ func TestGetClientCmd_offline_wireless(t *testing.T) {
 
 func TestListClientsCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListNetworkClientsFunc: func(_ context.Context, _ *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusUnauthorized, map[string]any{
+		ListNetworkClientsWithResponseFunc: func(_ context.Context, _ *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*gen.ListNetworkClientsResponse, error) {
+			return errClientsResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
 				"status": 401,
@@ -469,9 +587,9 @@ func TestListClientsCmd_apiError(t *testing.T) {
 func TestListClientsCmd_statusFilter(t *testing.T) {
 	var capturedParams *gen.ListNetworkClientsParams
 	stub := &StubClient{
-		ListNetworkClientsFunc: func(_ context.Context, params *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+		ListNetworkClientsWithResponseFunc: func(_ context.Context, params *gen.ListNetworkClientsParams, _ ...gen.RequestEditorFn) (*gen.ListNetworkClientsResponse, error) {
 			capturedParams = params
-			return jsonResponse(http.StatusOK, gen.NetworkClientList{Items: []gen.NetworkClient{}}), nil
+			return okClientsResp(gen.NetworkClientList{Items: []gen.NetworkClient{}}), nil
 		},
 	}
 
@@ -494,8 +612,8 @@ func TestListClientsCmd_statusFilter(t *testing.T) {
 
 func TestGetClientCmd_notFound(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkClientFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusNotFound, map[string]any{
+		GetNetworkClientWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkClientResponse, error) {
+			return errClientResp(http.StatusNotFound, map[string]any{
 				"type":   "https://homelab.local/problems/not-found",
 				"title":  "Not Found",
 				"status": 404,
@@ -518,19 +636,12 @@ func TestGetClientCmd_notFound(t *testing.T) {
 }
 
 func TestTopologyCmd_devicesOnly(t *testing.T) {
-	// Topology:
-	//   USG (gateway)
-	//   ├── Switch LR (switch) [port 1, 1 GbE]
-	//   │   └── AP-Office (accessPoint) [port 3, 1 GbE]
-	//   └── AP LR (accessPoint) [port 2, 1 GbE] [2 clients]
-	//
-	// USG has two direct children → exercises ├──, └──, and │ (continuation bar).
 	stub := &StubClient{
-		GetNetworkTopologyFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
 			if params.IncludeClients != nil {
 				t.Errorf("expected no IncludeClients param, got %v", *params.IncludeClients)
 			}
-			return jsonResponse(http.StatusOK, map[string]any{
+			return okTopologyResp(map[string]any{
 				"nodes": []any{
 					map[string]any{"kind": "device", "id": "unifi.usg", "uri": "/network/devices/unifi.usg", "name": "USG", "type": "gateway", "status": "connected"},
 					map[string]any{"kind": "device", "id": "unifi.sw", "uri": "/network/devices/unifi.sw", "name": "Switch LR", "type": "switch", "status": "connected"},
@@ -588,11 +699,11 @@ func TestTopologyCmd_devicesOnly(t *testing.T) {
 
 func TestTopologyCmd_includeClientsWiredOnly(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkTopologyFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
 			if params.IncludeClients == nil || !*params.IncludeClients {
 				t.Error("expected IncludeClients=true")
 			}
-			return jsonResponse(http.StatusOK, map[string]any{
+			return okTopologyResp(map[string]any{
 				"nodes": []any{
 					map[string]any{"kind": "device", "id": "unifi.usg", "uri": "/network/devices/unifi.usg", "name": "USG", "type": "gateway", "status": "connected"},
 					map[string]any{"kind": "device", "id": "unifi.sw", "uri": "/network/devices/unifi.sw", "name": "Switch LR", "type": "switch", "status": "connected"},
@@ -658,11 +769,11 @@ func TestTopologyCmd_includeClientsWiredOnly(t *testing.T) {
 
 func TestTopologyCmd_includeWireless(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkTopologyFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
 			if params.IncludeClients == nil || !*params.IncludeClients {
 				t.Error("expected IncludeClients=true (implied by --include-wireless)")
 			}
-			return jsonResponse(http.StatusOK, map[string]any{
+			return okTopologyResp(map[string]any{
 				"nodes": []any{
 					map[string]any{"kind": "device", "id": "unifi.usg", "uri": "/network/devices/unifi.usg", "name": "USG", "type": "gateway", "status": "connected"},
 					map[string]any{"kind": "device", "id": "unifi.ap", "uri": "/network/devices/unifi.ap", "name": "AP LR", "type": "accessPoint", "status": "connected"},
@@ -711,8 +822,8 @@ func TestTopologyCmd_jsonOutput(t *testing.T) {
 	defer func() { flags.OutputFormat = old }()
 
 	stub := &StubClient{
-		GetNetworkTopologyFunc: func(_ context.Context, _ *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, _ *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
+			return okTopologyResp(map[string]any{
 				"nodes": []any{},
 				"edges": []any{},
 			}), nil
@@ -735,8 +846,8 @@ func TestTopologyCmd_jsonOutput(t *testing.T) {
 
 func TestTopologyCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkTopologyFunc: func(_ context.Context, _ *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusUnauthorized, map[string]any{
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, _ *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
+			return errTopologyResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
 				"status": 401,
@@ -760,8 +871,8 @@ func TestTopologyCmd_apiError(t *testing.T) {
 
 func TestListVlansCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListVlansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.VlanList{
+		ListVlansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListVlansResponse, error) {
+			return okVlansResp(gen.VlanList{
 				Items: []gen.Vlan{
 					{Id: "unifi.default", Name: "Default", VlanId: 1, Subnet: "192.168.1.0/24"},
 					{Id: "unifi.iot", Name: "IoT", VlanId: 20, Subnet: "192.168.20.0/24"},
@@ -786,8 +897,8 @@ func TestListVlansCmd_tableOutput(t *testing.T) {
 
 func TestListVlansCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListVlansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusUnauthorized, map[string]any{
+		ListVlansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListVlansResponse, error) {
+			return errVlansResp(http.StatusUnauthorized, map[string]any{
 				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
 				"status": 401, "detail": "Bearer token missing",
 			}), nil
@@ -808,8 +919,8 @@ func TestListVlansCmd_apiError(t *testing.T) {
 
 func TestGetVlanCmd_serverDhcp(t *testing.T) {
 	stub := &StubClient{
-		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+			return okVlanResp(map[string]any{
 				"id": "unifi.iot", "uri": "/network/vlans/unifi.iot",
 				"name": "IoT", "vlanId": 20, "subnet": "192.168.20.0/24",
 				"gatewayIp": "192.168.20.1", "broadcastIp": "192.168.20.255",
@@ -840,8 +951,8 @@ func TestGetVlanCmd_serverDhcp(t *testing.T) {
 
 func TestGetVlanCmd_relayDhcp(t *testing.T) {
 	stub := &StubClient{
-		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+			return okVlanResp(map[string]any{
 				"id": "unifi.mgmt", "uri": "/network/vlans/unifi.mgmt",
 				"name": "Management", "vlanId": 99, "subnet": "10.0.99.0/24",
 				"gatewayIp": "10.0.99.1", "broadcastIp": "10.0.99.255",
@@ -871,8 +982,8 @@ func TestGetVlanCmd_relayDhcp(t *testing.T) {
 
 func TestGetVlanCmd_notFound(t *testing.T) {
 	stub := &StubClient{
-		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusNotFound, map[string]any{
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+			return errVlanResp(http.StatusNotFound, map[string]any{
 				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
 				"status": 404, "detail": "vlan not found",
 			}), nil
@@ -894,8 +1005,8 @@ func TestGetVlanCmd_notFound(t *testing.T) {
 
 func TestGetVlanCmd_disabledDhcp(t *testing.T) {
 	stub := &StubClient{
-		GetVlanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+			return okVlanResp(map[string]any{
 				"id": "unifi.servers", "uri": "/network/vlans/unifi.servers",
 				"name": "Servers", "vlanId": 10, "subnet": "192.168.10.0/24",
 				"gatewayIp": "192.168.10.1", "broadcastIp": "192.168.10.255",
@@ -927,8 +1038,8 @@ func TestGetVlanCmd_disabledDhcp(t *testing.T) {
 
 func TestListSsidsCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListSsidsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.SsidList{
+		ListSsidsWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListSsidsResponse, error) {
+			return okSsidsResp(gen.SsidList{
 				Items: []gen.Ssid{
 					{
 						Id: "unifi.home", Name: "Home", VlanId: 1,
@@ -961,8 +1072,8 @@ func TestListSsidsCmd_tableOutput(t *testing.T) {
 
 func TestListSsidsCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListSsidsFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusUnauthorized, map[string]any{
+		ListSsidsWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListSsidsResponse, error) {
+			return errSsidsResp(http.StatusUnauthorized, map[string]any{
 				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
 				"status": 401, "detail": "Bearer token missing",
 			}), nil
@@ -983,8 +1094,8 @@ func TestListSsidsCmd_apiError(t *testing.T) {
 
 func TestGetSsidCmd_withClients(t *testing.T) {
 	stub := &StubClient{
-		GetSsidFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetSsidResponse, error) {
+			return okSsidResp(map[string]any{
 				"id": "unifi.iot", "uri": "/network/ssids/unifi.iot",
 				"name": "IoT", "vlanId": 20,
 				"bands":      []string{"band2g", "band5g"},
@@ -1018,8 +1129,8 @@ func TestGetSsidCmd_withClients(t *testing.T) {
 
 func TestGetSsidCmd_notFound(t *testing.T) {
 	stub := &StubClient{
-		GetSsidFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusNotFound, map[string]any{
+		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetSsidResponse, error) {
+			return errSsidResp(http.StatusNotFound, map[string]any{
 				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
 				"status": 404, "detail": "ssid not found",
 			}), nil
@@ -1041,8 +1152,8 @@ func TestGetSsidCmd_notFound(t *testing.T) {
 
 func TestListWansCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListWansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, gen.WanList{
+		ListWansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListWansResponse, error) {
+			return okWansResp(gen.WanList{
 				Items: []gen.Wan{
 					{Id: "unifi.wan1", Name: "WAN 1", IpAddress: "203.0.113.42", Uptime: 86400, Status: gen.WanStatusConnected},
 					{Id: "unifi.wan2", Name: "WAN 2", IpAddress: "198.51.100.7", Uptime: 0, Status: gen.WanStatusFailover},
@@ -1067,8 +1178,8 @@ func TestListWansCmd_tableOutput(t *testing.T) {
 
 func TestListWansCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListWansFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusUnauthorized, map[string]any{
+		ListWansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListWansResponse, error) {
+			return errWansResp(http.StatusUnauthorized, map[string]any{
 				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
 				"status": 401, "detail": "Bearer token missing",
 			}), nil
@@ -1089,8 +1200,8 @@ func TestListWansCmd_apiError(t *testing.T) {
 
 func TestGetWanCmd_connected(t *testing.T) {
 	stub := &StubClient{
-		GetWanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, map[string]any{
+		GetWanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetWanResponse, error) {
+			return okWanResp(map[string]any{
 				"id": "unifi.wan1", "uri": "/network/wans/unifi.wan1",
 				"name": "WAN 1", "ipAddress": "203.0.113.42",
 				"uptime": 86400, "status": "connected",
@@ -1116,8 +1227,8 @@ func TestGetWanCmd_connected(t *testing.T) {
 
 func TestGetWanCmd_notFound(t *testing.T) {
 	stub := &StubClient{
-		GetWanFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*http.Response, error) {
-			return jsonResponse(http.StatusNotFound, map[string]any{
+		GetWanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetWanResponse, error) {
+			return errWanResp(http.StatusNotFound, map[string]any{
 				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
 				"status": 404, "detail": "wan not found",
 			}), nil

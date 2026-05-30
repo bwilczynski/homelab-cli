@@ -2,9 +2,7 @@ package storage
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
@@ -63,29 +61,20 @@ func newListVolumesCmd(client StorageClient) *cobra.Command {
 				params.Device = &device
 			}
 
-			resp, err := c.ListStorageVolumes(context.Background(), params)
+			resp, err := c.ListStorageVolumesWithResponse(context.Background(), params)
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.VolumeList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			list := resp.JSON200
 			headers := []string{"ID", "NAME", "DEVICE", "RAID", "STATUS", "SIZE", "USED"}
 			var rows [][]string
 			for _, v := range list.Items {
@@ -119,30 +108,20 @@ func newGetVolumeCmd(client StorageClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetStorageVolume(context.Background(), args[0])
+			resp, err := c.GetStorageVolumeWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.VolumeDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			return printVolumeDetail(cmd, detail)
+			return printVolumeDetail(cmd, *resp.JSON200)
 		},
 	}
 }
@@ -219,29 +198,20 @@ func newListBackupsCmd(client StorageClient) *cobra.Command {
 				params.Device = &device
 			}
 
-			resp, err := c.ListBackups(context.Background(), params)
+			resp, err := c.ListBackupsWithResponse(context.Background(), params)
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.BackupTaskList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			list := resp.JSON200
 			headers := []string{"ID", "NAME", "DEVICE", "STATUS", "LAST RESULT", "TYPE"}
 			var rows [][]string
 			for _, t := range list.Items {
@@ -273,29 +243,20 @@ func newGetBackupCmd(client StorageClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetBackup(context.Background(), args[0])
+			resp, err := c.GetBackupWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.BackupTaskDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			detail := resp.JSON200
 			headers := []string{"FIELD", "VALUE"}
 			rows := [][]string{
 				{"ID", detail.Id},

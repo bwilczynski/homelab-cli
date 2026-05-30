@@ -3,7 +3,6 @@ package system
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,29 +61,20 @@ func newHealthCmd(client SystemClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetSystemHealth(context.Background())
+			resp, err := c.GetSystemHealthWithResponse(context.Background())
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var health gen.Health
-			if err := json.Unmarshal(body, &health); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			health := resp.JSON200
 			headers := []string{"COMPONENT", "STATUS"}
 			var rows [][]string
 			for _, comp := range health.Components {
@@ -116,29 +106,20 @@ func newInfoCmd(client SystemClient) *cobra.Command {
 				params.Device = &device
 			}
 
-			resp, err := c.ListSystemInfo(context.Background(), params)
+			resp, err := c.ListSystemInfoWithResponse(context.Background(), params)
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.SystemInfoList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			list := resp.JSON200
 			headers := []string{"DEVICE", "MODEL", "FIRMWARE", "RAM", "UPTIME"}
 			var rows [][]string
 			for _, info := range list.Items {
@@ -180,29 +161,20 @@ func newUtilizationCmd(client SystemClient) *cobra.Command {
 			params.Device = &device
 		}
 
-		resp, err := c.ListSystemUtilization(ctx, params)
+		resp, err := c.ListSystemUtilizationWithResponse(ctx, params)
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseError(resp)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		var list gen.SystemUtilizationList
-		if err := json.Unmarshal(body, &list); err != nil {
-			return err
+		if resp.StatusCode() != http.StatusOK {
+			return apiclient.ParseError(resp.StatusCode(), resp.Body)
 		}
 
 		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(body))
+			fmt.Fprint(w, string(resp.Body))
 			return nil
 		}
 
+		list := resp.JSON200
 		headers := []string{"DEVICE", "CPU", "MEMORY", "SWAP"}
 		var rows [][]string
 		for _, u := range list.Items {
@@ -251,30 +223,20 @@ func newListUpdatesCmd(client SystemClient) *cobra.Command {
 				params.Type = &ut
 			}
 
-			resp, err := c.ListSystemUpdates(context.Background(), params)
+			resp, err := c.ListSystemUpdatesWithResponse(context.Background(), params)
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.SystemUpdateList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			return printUpdateList(cmd.OutOrStdout(), list)
+			return printUpdateList(cmd.OutOrStdout(), *resp.JSON200)
 		},
 	}
 
@@ -311,29 +273,20 @@ func newGetUpdateCmd(client SystemClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetSystemUpdate(context.Background(), args[0])
+			resp, err := c.GetSystemUpdateWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.SystemUpdateDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			detail := resp.JSON200
 			disc, err := detail.Discriminator()
 			if err != nil {
 				return err
@@ -382,30 +335,20 @@ func newCheckUpdatesCmd(client SystemClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.CheckSystemUpdates(context.Background(), &gen.CheckSystemUpdatesParams{})
+			resp, err := c.CheckSystemUpdatesWithResponse(context.Background(), &gen.CheckSystemUpdatesParams{})
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseError(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.SystemUpdateList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			return printUpdateList(cmd.OutOrStdout(), list)
+			return printUpdateList(cmd.OutOrStdout(), *resp.JSON200)
 		},
 	}
 }
