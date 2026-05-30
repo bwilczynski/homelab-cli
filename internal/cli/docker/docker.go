@@ -2,7 +2,6 @@ package docker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -71,29 +70,20 @@ func newListCmd(client DockerClient) *cobra.Command {
 			params.Device = &device
 		}
 
-		resp, err := c.ListContainers(ctx, params)
+		resp, err := c.ListContainersWithResponse(ctx, params)
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return apiclient.ParseErrorResponse(resp)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		var list gen.ContainerList
-		if err := json.Unmarshal(body, &list); err != nil {
-			return err
+		if resp.StatusCode() != http.StatusOK {
+			return apiclient.ParseError(resp.StatusCode(), resp.Body)
 		}
 
 		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(body))
+			fmt.Fprint(w, string(resp.Body))
 			return nil
 		}
 
+		list := resp.JSON200
 		headers := []string{"ID", "IMAGE", "STATUS", "CPU", "MEMORY"}
 		var rows [][]string
 		for _, c := range list.Items {
@@ -128,30 +118,20 @@ func newGetCmd(client DockerClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetContainer(context.Background(), args[0])
+			resp, err := c.GetContainerWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.ContainerDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			return printContainerDetail(cmd, detail)
+			return printContainerDetail(cmd, *resp.JSON200)
 		},
 	}
 }
@@ -285,13 +265,12 @@ func newStartCmd(client DockerClient) *cobra.Command {
 					return err
 				}
 			}
-			resp, err := c.StartContainer(context.Background(), args[0], &gen.StartContainerParams{})
+			resp, err := c.StartContainerWithResponse(context.Background(), args[0], &gen.StartContainerParams{})
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusNoContent {
-				return apiclient.ParseErrorResponse(resp)
+			if resp.StatusCode() != http.StatusNoContent {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Container %s started\n", args[0])
 			return nil
@@ -313,13 +292,12 @@ func newStopCmd(client DockerClient) *cobra.Command {
 					return err
 				}
 			}
-			resp, err := c.StopContainer(context.Background(), args[0], &gen.StopContainerParams{})
+			resp, err := c.StopContainerWithResponse(context.Background(), args[0], &gen.StopContainerParams{})
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusNoContent {
-				return apiclient.ParseErrorResponse(resp)
+			if resp.StatusCode() != http.StatusNoContent {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Container %s stopped\n", args[0])
 			return nil
@@ -341,13 +319,12 @@ func newRestartCmd(client DockerClient) *cobra.Command {
 					return err
 				}
 			}
-			resp, err := c.RestartContainer(context.Background(), args[0], &gen.RestartContainerParams{})
+			resp, err := c.RestartContainerWithResponse(context.Background(), args[0], &gen.RestartContainerParams{})
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusNoContent {
-				return apiclient.ParseErrorResponse(resp)
+			if resp.StatusCode() != http.StatusNoContent {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Container %s restarted\n", args[0])
 			return nil
@@ -386,29 +363,20 @@ func newListNetworksCmd(client DockerClient) *cobra.Command {
 				params.Device = &device
 			}
 
-			resp, err := c.ListDockerNetworks(context.Background(), params)
+			resp, err := c.ListDockerNetworksWithResponse(context.Background(), params)
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.DockerNetworkList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			list := resp.JSON200
 			headers := []string{"ID", "NAME", "DEVICE", "CONTAINERS"}
 			var rows [][]string
 			for _, n := range list.Items {
@@ -440,30 +408,20 @@ func newGetNetworkCmd(client DockerClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetDockerNetwork(context.Background(), args[0])
+			resp, err := c.GetDockerNetworkWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.DockerNetworkDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			return printNetworkDetail(cmd, detail)
+			return printNetworkDetail(cmd, *resp.JSON200)
 		},
 	}
 }
@@ -536,29 +494,20 @@ func newListImagesCmd(client DockerClient) *cobra.Command {
 				params.Device = &device
 			}
 
-			resp, err := c.ListDockerImages(context.Background(), params)
+			resp, err := c.ListDockerImagesWithResponse(context.Background(), params)
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var list gen.DockerImageList
-			if err := json.Unmarshal(body, &list); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
+			list := resp.JSON200
 			headers := []string{"ID", "DEVICE", "REPOSITORY", "TAGS", "SIZE"}
 			var rows [][]string
 			for _, img := range list.Items {
@@ -593,30 +542,20 @@ func newGetImageCmd(client DockerClient) *cobra.Command {
 				}
 			}
 
-			resp, err := c.GetDockerImage(context.Background(), args[0])
+			resp, err := c.GetDockerImageWithResponse(context.Background(), args[0])
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
-			if resp.StatusCode != http.StatusOK {
-				return apiclient.ParseErrorResponse(resp)
-			}
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			var detail gen.DockerImageDetail
-			if err := json.Unmarshal(body, &detail); err != nil {
-				return err
+			if resp.StatusCode() != http.StatusOK {
+				return apiclient.ParseError(resp.StatusCode(), resp.Body)
 			}
 
 			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(body))
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
 				return nil
 			}
 
-			return printImageDetail(cmd, detail)
+			return printImageDetail(cmd, *resp.JSON200)
 		},
 	}
 }
