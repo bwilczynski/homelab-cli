@@ -1,0 +1,4 @@
+DEVICE	MODEL	FIRMWARE	RAM	UPTIME
+{{ range .Items -}}
+{{ .Device }}	{{ .Model }}	{{ .Firmware }}	{{ .Ram }}	{{ .Uptime }}
+{{ end -}}

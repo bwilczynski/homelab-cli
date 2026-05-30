@@ -1,0 +1,13 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+DEVICE	{{ .Device }}
+TYPE	{{ string .Type }}
+STATUS	{{ string .Status }}
+CURRENT	{{ .CurrentVersion }}
+LATEST	{{ .LatestVersion }}
+CHECKED AT	{{ formatTime .CheckedAt }}
+PUBLISHED AT	{{ formatTime .PublishedAt }}
+IMAGE	{{ .Image }}
+SOURCE	{{ .Source }}
+RELEASE URL	{{ .ReleaseUrl }}

@@ -1,0 +1,4 @@
+COMPONENT	STATUS
+{{ range .Components -}}
+{{ .Name }}	{{ string .Status }}
+{{ end -}}
