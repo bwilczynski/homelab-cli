@@ -11,6 +11,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	containersListView = cmdutil.View{Templates: dockerTemplates, Name: "containers_list.tmpl"}
+	containersGetView  = cmdutil.View{Templates: dockerTemplates, Name: "containers_get.tmpl"}
+	networksListView   = cmdutil.View{Templates: dockerTemplates, Name: "networks_list.tmpl"}
+	networksGetView    = cmdutil.View{Templates: dockerTemplates, Name: "networks_get.tmpl"}
+	imagesListView     = cmdutil.View{Templates: dockerTemplates, Name: "images_list.tmpl"}
+	imagesGetView      = cmdutil.View{Templates: dockerTemplates, Name: "images_get.tmpl"}
+)
 
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "docker", Short: "Docker resources"}
@@ -47,7 +55,7 @@ func newListCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return cmdutil.View{Templates: dockerTemplates, Name: "containers_list.tmpl"}.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)
+		return containersListView.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)
 	})
 	watch.RegisterFlags(cmd)
 	return cmd
@@ -60,7 +68,7 @@ func newGetCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return cmdutil.View{Templates: dockerTemplates, Name: "containers_get.tmpl"}.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return containersGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
@@ -119,7 +127,7 @@ func newListNetworksCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return cmdutil.View{Templates: dockerTemplates, Name: "networks_list.tmpl"}.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return networksListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
@@ -131,7 +139,7 @@ func newGetNetworkCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return cmdutil.View{Templates: dockerTemplates, Name: "networks_get.tmpl"}.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return networksGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
@@ -157,7 +165,7 @@ func newListImagesCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return cmdutil.View{Templates: dockerTemplates, Name: "images_list.tmpl"}.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return imagesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
@@ -169,7 +177,7 @@ func newGetImageCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return cmdutil.View{Templates: dockerTemplates, Name: "images_get.tmpl"}.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return imagesGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
