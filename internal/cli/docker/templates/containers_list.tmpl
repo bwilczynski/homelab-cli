@@ -1,0 +1,4 @@
+ID	IMAGE	STATUS	CPU	MEMORY
+{{ range .Items -}}
+{{ .Id }}	{{ .Image }}	{{ string .Status }}	{{ printf "%.1f%%" .Resources.CpuPercent }}	{{ formatBytes .Resources.MemoryBytes }}
+{{ end -}}

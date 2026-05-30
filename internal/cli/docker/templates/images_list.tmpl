@@ -1,0 +1,4 @@
+ID	DEVICE	REPOSITORY	TAGS	SIZE
+{{ range .Items -}}
+{{ .Id }}	{{ .Device }}	{{ .Repository }}	{{ join .Tags ", " }}	{{ formatBytes .Size }}
+{{ end -}}
