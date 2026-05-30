@@ -179,6 +179,7 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 		},
 		"derefInt":   derefOrZero[int],
 		"derefFloat": derefOrZero[float32],
+		"derefInt64": derefOrZero[int64],
 		"string": func(v any) string {
 			rv := reflect.ValueOf(v)
 			if rv.Kind() == reflect.String {
@@ -263,6 +264,13 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 			if rv.Kind() != reflect.Map {
 				return nil
 			}
+			// Only string-keyed maps are supported.
+			for _, k := range rv.MapKeys() {
+				if k.Kind() != reflect.String {
+					return nil
+				}
+				break
+			}
 			pairs := make([][2]string, 0, rv.Len())
 			for _, k := range rv.MapKeys() {
 				pairs = append(pairs, [2]string{k.String(), fmt.Sprintf("%v", rv.MapIndex(k).Interface())})
@@ -277,23 +285,6 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 			return *v
 		},
 		"derefTime": derefOrZero[time.Time],
-		"derefInt64": func(v any) int64 {
-			if v == nil {
-				return 0
-			}
-			rv := reflect.ValueOf(v)
-			if rv.Kind() == reflect.Pointer {
-				if rv.IsNil() {
-					return 0
-				}
-				rv = rv.Elem()
-			}
-			switch rv.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				return rv.Int()
-			}
-			return 0
-		},
 	}
 
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(fsys, "*.tmpl")
