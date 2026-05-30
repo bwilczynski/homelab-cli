@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	gen "github.com/bwilczynski/hlctl/internal/docker"
 )
 
@@ -78,7 +79,8 @@ func TestListContainersCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListCmd(stub)
+	cmd := newListCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -105,7 +107,8 @@ func TestListContainersCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListCmd(stub)
+	cmd := newListCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -138,7 +141,8 @@ func TestGetContainerCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetCmd(stub)
+	cmd := newGetCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -161,7 +165,8 @@ func TestStartContainerCmd(t *testing.T) {
 			return noContentStartResp(), nil
 		},
 	}
-	cmd := newStartCmd(stub)
+	cmd := newStartCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -179,7 +184,8 @@ func TestStopContainerCmd(t *testing.T) {
 			return noContentStopResp(), nil
 		},
 	}
-	cmd := newStopCmd(stub)
+	cmd := newStopCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -197,7 +203,8 @@ func TestRestartContainerCmd(t *testing.T) {
 			return noContentRestartResp(), nil
 		},
 	}
-	cmd := newRestartCmd(stub)
+	cmd := newRestartCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -226,7 +233,8 @@ func TestListNetworksCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListNetworksCmd(stub)
+	cmd := newListNetworksCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -261,7 +269,8 @@ func TestGetNetworkCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetNetworkCmd(stub)
+	cmd := newGetNetworkCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.immich_default"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -296,7 +305,8 @@ func TestListImagesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListImagesCmd(stub)
+	cmd := newListImagesCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -327,7 +337,8 @@ func TestGetImageCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetImageCmd(stub)
+	cmd := newGetImageCmd()
+	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.925ff61909ae"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
