@@ -1,4 +1,3 @@
-// internal/cli/system/system.go
 package system
 
 import (
