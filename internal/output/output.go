@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"reflect"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"text/template"
@@ -247,6 +248,51 @@ func RenderTemplate(w io.Writer, fsys fs.FS, name string, data any) error {
 		},
 		"flush": func() (string, error) {
 			return "", tw.Flush()
+		},
+		"sortedPairs": func(v any) [][2]string {
+			if v == nil {
+				return nil
+			}
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.Pointer {
+				if rv.IsNil() {
+					return nil
+				}
+				rv = rv.Elem()
+			}
+			if rv.Kind() != reflect.Map {
+				return nil
+			}
+			pairs := make([][2]string, 0, rv.Len())
+			for _, k := range rv.MapKeys() {
+				pairs = append(pairs, [2]string{k.String(), fmt.Sprintf("%v", rv.MapIndex(k).Interface())})
+			}
+			sort.Slice(pairs, func(i, j int) bool { return pairs[i][0] < pairs[j][0] })
+			return pairs
+		},
+		"derefStrSlice": func(v *[]string) []string {
+			if v == nil {
+				return nil
+			}
+			return *v
+		},
+		"derefTime": derefOrZero[time.Time],
+		"derefInt64": func(v any) int64 {
+			if v == nil {
+				return 0
+			}
+			rv := reflect.ValueOf(v)
+			if rv.Kind() == reflect.Pointer {
+				if rv.IsNil() {
+					return 0
+				}
+				rv = rv.Elem()
+			}
+			switch rv.Kind() {
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				return rv.Int()
+			}
+			return 0
 		},
 	}
 

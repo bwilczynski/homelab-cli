@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/bwilczynski/hlctl/internal/output"
 )
@@ -211,5 +212,107 @@ func TestRenderTemplate_flush(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
+	}
+}
+
+func TestRenderTemplate_sortedPairs(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte(
+			"{{ range sortedPairs .M }}{{ index . 0 }}\t{{ index . 1 }}\n{{ end }}",
+		)},
+	}
+	type data struct{ M map[string]string }
+	var buf bytes.Buffer
+	err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{M: map[string]string{"b": "2", "a": "1", "c": "3"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"a", "1", "b", "2", "c", "3"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	if strings.Index(out, "a") > strings.Index(out, "b") || strings.Index(out, "b") > strings.Index(out, "c") {
+		t.Errorf("expected sorted order a < b < c, got:\n%s", out)
+	}
+}
+
+func TestRenderTemplate_sortedPairs_nil(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte("{{ if sortedPairs .M }}HAS{{ else }}EMPTY{{ end }}")},
+	}
+	type data struct{ M *map[string]string }
+	var buf bytes.Buffer
+	if err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{M: nil}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "EMPTY") {
+		t.Errorf("expected EMPTY for nil map, got: %s", buf.String())
+	}
+}
+
+func TestRenderTemplate_derefStrSlice(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte(`{{ join (derefStrSlice .S) ", " }}`)},
+	}
+	s := []string{"x", "y", "z"}
+	type data struct{ S *[]string }
+	var buf bytes.Buffer
+	if err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{S: &s}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "x, y, z") {
+		t.Errorf("expected 'x, y, z', got: %s", buf.String())
+	}
+}
+
+func TestRenderTemplate_derefStrSlice_nil(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte(`{{ if derefStrSlice .S }}HAS{{ else }}EMPTY{{ end }}`)},
+	}
+	type data struct{ S *[]string }
+	var buf bytes.Buffer
+	if err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{S: nil}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "EMPTY") {
+		t.Errorf("expected EMPTY for nil slice, got: %s", buf.String())
+	}
+}
+
+func TestRenderTemplate_derefTimeAndInt64(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte("{{ formatTime (derefTime .T) }}\n{{ derefInt64 .N }}")},
+	}
+	ts := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	n := int64(42)
+	type data struct {
+		T *time.Time
+		N *int64
+	}
+	var buf bytes.Buffer
+	if err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{T: &ts, N: &n}); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"2026-01-02", "42"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderTemplate_derefInt64_nil(t *testing.T) {
+	fsys := fstest.MapFS{
+		"t.tmpl": &fstest.MapFile{Data: []byte("{{ derefInt64 .N }}")},
+	}
+	type data struct{ N *int64 }
+	var buf bytes.Buffer
+	if err := output.RenderTemplate(&buf, fsys, "t.tmpl", data{N: nil}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(buf.String()) != "0" {
+		t.Errorf("expected 0 for nil int64, got: %s", buf.String())
 	}
 }
