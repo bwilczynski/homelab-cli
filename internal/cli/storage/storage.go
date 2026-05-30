@@ -74,18 +74,7 @@ func newListVolumesCmd(client StorageClient) *cobra.Command {
 				return nil
 			}
 
-			list := resp.JSON200
-			headers := []string{"ID", "NAME", "DEVICE", "RAID", "STATUS", "SIZE", "USED"}
-			var rows [][]string
-			for _, v := range list.Items {
-				rows = append(rows, []string{
-					v.Id, v.Name, v.Device, v.RaidType,
-					string(v.Status),
-					output.FormatBytes(v.TotalBytes),
-					output.FormatBytes(v.UsedBytes),
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), storageTemplates, "volumes_list.tmpl", *resp.JSON200)
 		},
 	}
 
@@ -121,50 +110,9 @@ func newGetVolumeCmd(client StorageClient) *cobra.Command {
 				return nil
 			}
 
-			return printVolumeDetail(cmd, *resp.JSON200)
+			return output.RenderTemplate(cmd.OutOrStdout(), storageTemplates, "volumes_get.tmpl", *resp.JSON200)
 		},
 	}
-}
-
-func printVolumeDetail(cmd *cobra.Command, d gen.VolumeDetail) error {
-	w := cmd.OutOrStdout()
-
-	headers := []string{"FIELD", "VALUE"}
-	rows := [][]string{
-		{"ID", d.Id},
-		{"NAME", d.Name},
-		{"DEVICE", d.Device},
-		{"FILESYSTEM", d.FileSystem},
-		{"RAID", d.RaidType},
-		{"STATUS", string(d.Status)},
-		{"POOL STATUS", string(d.PoolStatus)},
-		{"MOUNT PATH", d.MountPath},
-		{"SIZE", output.FormatBytes(d.TotalBytes)},
-		{"USED", output.FormatBytes(d.UsedBytes)},
-	}
-	if err := output.Print(w, output.FormatTable, nil, headers, rows); err != nil {
-		return err
-	}
-
-	if len(d.Disks) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "DISKS")
-		var diskRows [][]string
-		for _, disk := range d.Disks {
-			diskRows = append(diskRows, []string{
-				disk.Id,
-				disk.Model,
-				string(disk.Status),
-				fmt.Sprintf("%d°C", disk.TemperatureCelsius),
-				output.FormatBytes(disk.TotalBytes),
-			})
-		}
-		if err := output.Print(w, output.FormatTable, nil, []string{"ID", "MODEL", "STATUS", "TEMP", "SIZE"}, diskRows); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func newBackupsCmd() *cobra.Command {
@@ -211,16 +159,7 @@ func newListBackupsCmd(client StorageClient) *cobra.Command {
 				return nil
 			}
 
-			list := resp.JSON200
-			headers := []string{"ID", "NAME", "DEVICE", "STATUS", "LAST RESULT", "TYPE"}
-			var rows [][]string
-			for _, t := range list.Items {
-				rows = append(rows, []string{
-					t.Id, t.Name, t.Device,
-					string(t.Status), string(t.LastResult), t.Type,
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), storageTemplates, "backups_list.tmpl", *resp.JSON200)
 		},
 	}
 
@@ -256,35 +195,7 @@ func newGetBackupCmd(client StorageClient) *cobra.Command {
 				return nil
 			}
 
-			detail := resp.JSON200
-			headers := []string{"FIELD", "VALUE"}
-			rows := [][]string{
-				{"ID", detail.Id},
-				{"NAME", detail.Name},
-				{"DEVICE", detail.Device},
-				{"STATUS", string(detail.Status)},
-				{"LAST RESULT", string(detail.LastResult)},
-				{"TYPE", detail.Type},
-			}
-			if detail.LastRunAt != nil {
-				rows = append(rows, []string{"LAST RUN", output.FormatTime(*detail.LastRunAt)})
-			}
-			if detail.NextRunAt != nil {
-				rows = append(rows, []string{"NEXT RUN", output.FormatTime(*detail.NextRunAt)})
-			}
-			if detail.Size != nil {
-				rows = append(rows, []string{"SIZE", output.FormatBytes(*detail.Size)})
-			}
-			if detail.Folders != nil && len(*detail.Folders) > 0 {
-				for i, folder := range *detail.Folders {
-					label := "FOLDERS"
-					if i > 0 {
-						label = ""
-					}
-					rows = append(rows, []string{label, folder})
-				}
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), storageTemplates, "backups_get.tmpl", *resp.JSON200)
 		},
 	}
 }

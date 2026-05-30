@@ -1,0 +1,4 @@
+ID	NAME	DEVICE	STATUS	LAST RESULT	TYPE
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .Device }}	{{ string .Status }}	{{ string .LastResult }}	{{ .Type }}
+{{ end -}}

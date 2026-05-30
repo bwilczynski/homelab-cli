@@ -1,0 +1,19 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+DEVICE	{{ .Device }}
+STATUS	{{ string .Status }}
+LAST RESULT	{{ string .LastResult }}
+TYPE	{{ .Type }}
+{{- if .LastRunAt }}
+LAST RUN	{{ formatTime (derefTime .LastRunAt) }}
+{{- end }}
+{{- if .NextRunAt }}
+NEXT RUN	{{ formatTime (derefTime .NextRunAt) }}
+{{- end }}
+{{- if .Size }}
+SIZE	{{ formatBytes (derefInt64 .Size) }}
+{{- end }}
+{{- if .Folders }}
+FOLDERS	{{ join (derefStrSlice .Folders) ", " }}
+{{- end }}

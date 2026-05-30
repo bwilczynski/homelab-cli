@@ -1,0 +1,4 @@
+ID	NAME	DEVICE	RAID	STATUS	SIZE	USED
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .Device }}	{{ .RaidType }}	{{ string .Status }}	{{ formatBytes .TotalBytes }}	{{ formatBytes .UsedBytes }}
+{{ end -}}
