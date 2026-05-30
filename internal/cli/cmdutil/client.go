@@ -2,6 +2,7 @@ package cmdutil
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/cobra"
 )
@@ -24,16 +25,22 @@ func InjectClient[C any](cmd *cobra.Command, build func() (C, error)) {
 	}
 }
 
-// Client returns the client previously injected for type C. Panics if no
-// client is set — callers should always run under an InjectClient ancestor
-// or after a SetClient call.
+// Client returns the client previously injected for type C. Panics with a
+// diagnostic message if no client is set — callers should always run under
+// an InjectClient ancestor or after a SetClient call.
 func Client[C any](cmd *cobra.Command) C {
-	return cmd.Context().Value(clientKey[C]{}).(C)
+	v := cmd.Context().Value(clientKey[C]{})
+	if v == nil {
+		var zero C
+		panic(fmt.Sprintf("cmdutil.Client[%T]: no client injected — call InjectClient on a parent or SetClient in tests", zero))
+	}
+	return v.(C)
 }
 
 // SetClient layers a client value onto cmd's existing context. Intended for
 // tests that exercise a leaf command directly (without its real parent's
-// PersistentPreRunE chain). Preserves any pre-existing context values.
+// PersistentPreRunE chain). Preserves any pre-existing context values; if cmd
+// has no context yet, starts from context.Background.
 func SetClient[C any](cmd *cobra.Command, c C) {
 	ctx := cmd.Context()
 	if ctx == nil {
