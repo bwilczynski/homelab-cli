@@ -1,0 +1,4 @@
+ID	NAME	DEVICE	TYPE	STATUS	CURRENT	LATEST
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .Device }}	{{ string .Type }}	{{ string .Status }}	{{ .CurrentVersion }}	{{ .LatestVersion }}
+{{ end -}}

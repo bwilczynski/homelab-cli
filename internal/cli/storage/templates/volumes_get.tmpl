@@ -1,0 +1,19 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+DEVICE	{{ .Device }}
+FILESYSTEM	{{ .FileSystem }}
+RAID	{{ .RaidType }}
+STATUS	{{ string .Status }}
+POOL STATUS	{{ string .PoolStatus }}
+MOUNT PATH	{{ .MountPath }}
+SIZE	{{ formatBytes .TotalBytes }}
+USED	{{ formatBytes .UsedBytes }}
+{{- if .Disks }}
+{{ flush }}
+DISKS
+ID	MODEL	STATUS	TEMP	SIZE
+{{ range .Disks -}}
+{{ .Id }}	{{ .Model }}	{{ string .Status }}	{{ .TemperatureCelsius }}°C	{{ formatBytes .TotalBytes }}
+{{ end -}}
+{{- end }}

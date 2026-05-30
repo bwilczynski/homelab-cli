@@ -1,0 +1,4 @@
+ID	NAME	DEVICE	CONTAINERS
+{{ range .Items -}}
+{{ .Id }}	{{ .Name }}	{{ .Device }}	{{ .ConnectedContainers }}
+{{ end -}}

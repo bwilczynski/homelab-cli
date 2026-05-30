@@ -1,4 +1,3 @@
-// internal/cli/system/system.go
 package system
 
 import (
@@ -39,6 +38,21 @@ func newUpdatesCmd() *cobra.Command {
 	return cmd
 }
 
+type infoRow struct {
+	Device   string
+	Model    string
+	Firmware string
+	Ram      string
+	Uptime   string
+}
+
+type utilizationRow struct {
+	Device string
+	Cpu    string
+	Memory string
+	Swap   string
+}
+
 func buildClient() (SystemClient, error) {
 	httpClient, apiURL, err := apiclient.NewHTTPClient()
 	if err != nil {
@@ -74,13 +88,7 @@ func newHealthCmd(client SystemClient) *cobra.Command {
 				return nil
 			}
 
-			health := resp.JSON200
-			headers := []string{"COMPONENT", "STATUS"}
-			var rows [][]string
-			for _, comp := range health.Components {
-				rows = append(rows, []string{comp.Name, string(comp.Status)})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), health, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "health.tmpl", *resp.JSON200)
 		},
 	}
 }
@@ -120,18 +128,17 @@ func newInfoCmd(client SystemClient) *cobra.Command {
 			}
 
 			list := resp.JSON200
-			headers := []string{"DEVICE", "MODEL", "FIRMWARE", "RAM", "UPTIME"}
-			var rows [][]string
+			var items []infoRow
 			for _, info := range list.Items {
-				rows = append(rows, []string{
-					info.Device,
-					info.Model,
-					info.Firmware,
-					output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
-					output.FormatUptime(int(info.UptimeSeconds)),
+				items = append(items, infoRow{
+					Device:   info.Device,
+					Model:    info.Model,
+					Firmware: info.Firmware,
+					Ram:      output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
+					Uptime:   output.FormatUptime(int(info.UptimeSeconds)),
 				})
 			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "info.tmpl", struct{ Items []infoRow }{items})
 		},
 	}
 
@@ -175,21 +182,20 @@ func newUtilizationCmd(client SystemClient) *cobra.Command {
 		}
 
 		list := resp.JSON200
-		headers := []string{"DEVICE", "CPU", "MEMORY", "SWAP"}
-		var rows [][]string
+		var items []utilizationRow
 		for _, u := range list.Items {
 			swapPct := 0
 			if u.Memory.SwapTotalBytes > 0 {
 				swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
 			}
-			rows = append(rows, []string{
-				u.Device,
-				fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
-				fmt.Sprintf("%d%%", u.Memory.UsedPercent),
-				fmt.Sprintf("%d%%", swapPct),
+			items = append(items, utilizationRow{
+				Device: u.Device,
+				Cpu:    fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
+				Memory: fmt.Sprintf("%d%%", u.Memory.UsedPercent),
+				Swap:   fmt.Sprintf("%d%%", swapPct),
 			})
 		}
-		return output.Print(w, flags.GetOutputFormat(), list, headers, rows)
+		return output.RenderTemplate(w, systemTemplates, "utilization.tmpl", struct{ Items []utilizationRow }{items})
 	})
 
 	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
@@ -236,26 +242,13 @@ func newListUpdatesCmd(client SystemClient) *cobra.Command {
 				return nil
 			}
 
-			return printUpdateList(cmd.OutOrStdout(), *resp.JSON200)
+			return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "updates_list.tmpl", *resp.JSON200)
 		},
 	}
 
 	cmd.Flags().StringVar(&status, "status", "", "Filter by update status (unknown, upToDate, updateAvailable)")
 	cmd.Flags().StringVar(&updateType, "type", "", "Filter by component type (container)")
 	return cmd
-}
-
-func printUpdateList(w io.Writer, list gen.SystemUpdateList) error {
-	headers := []string{"ID", "NAME", "DEVICE", "TYPE", "STATUS", "CURRENT", "LATEST"}
-	var rows [][]string
-	for _, u := range list.Items {
-		rows = append(rows, []string{
-			u.Id, u.Name, u.Device,
-			string(u.Type), string(u.Status),
-			u.CurrentVersion, u.LatestVersion,
-		})
-	}
-	return output.Print(w, output.FormatTable, list, headers, rows)
 }
 
 func newGetUpdateCmd(client SystemClient) *cobra.Command {
@@ -298,22 +291,7 @@ func newGetUpdateCmd(client SystemClient) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				headers := []string{"FIELD", "VALUE"}
-				rows := [][]string{
-					{"ID", d.Id},
-					{"NAME", d.Name},
-					{"DEVICE", d.Device},
-					{"TYPE", string(d.Type)},
-					{"STATUS", string(d.Status)},
-					{"CURRENT", d.CurrentVersion},
-					{"LATEST", d.LatestVersion},
-					{"CHECKED AT", output.FormatTime(d.CheckedAt)},
-					{"PUBLISHED AT", output.FormatTime(d.PublishedAt)},
-					{"IMAGE", d.Image},
-					{"SOURCE", d.Source},
-					{"RELEASE URL", d.ReleaseUrl},
-				}
-				return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), detail, headers, rows)
+				return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "updates_get_container.tmpl", d)
 			default:
 				return fmt.Errorf("unknown update type: %s", disc)
 			}
@@ -348,7 +326,7 @@ func newCheckUpdatesCmd(client SystemClient) *cobra.Command {
 				return nil
 			}
 
-			return printUpdateList(cmd.OutOrStdout(), *resp.JSON200)
+			return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "updates_list.tmpl", *resp.JSON200)
 		},
 	}
 }

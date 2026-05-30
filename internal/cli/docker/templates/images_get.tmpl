@@ -1,0 +1,10 @@
+FIELD	VALUE
+ID	{{ .Id }}
+DEVICE	{{ .Device }}
+REPOSITORY	{{ .Repository }}
+TAGS	{{ join .Tags ", " }}
+SIZE	{{ formatBytes .Size }}
+VIRTUAL SIZE	{{ formatBytes .VirtualSize }}
+{{- if not (.Created.IsZero) }}
+CREATED	{{ formatTime .Created }}
+{{- end }}

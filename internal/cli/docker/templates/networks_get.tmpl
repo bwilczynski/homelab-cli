@@ -1,0 +1,20 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+DEVICE	{{ .Device }}
+DRIVER	{{ .Driver }}
+CONTAINERS	{{ .ConnectedContainers }}
+{{- if .Subnet }}
+SUBNET	{{ derefStr .Subnet }}
+{{- end }}
+{{- if .Gateway }}
+GATEWAY	{{ derefStr .Gateway }}
+{{- end }}
+{{- if .Containers }}
+{{ flush }}
+CONNECTED CONTAINERS
+NAME
+{{ range .Containers -}}
+{{ . }}
+{{ end -}}
+{{- end }}

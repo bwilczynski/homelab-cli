@@ -1,0 +1,69 @@
+FIELD	VALUE
+ID	{{ .Id }}
+NAME	{{ .Name }}
+DEVICE	{{ .Device }}
+STATUS	{{ string .Status }}
+IMAGE	{{ .Image }}
+RESTART COUNT	{{ .RestartCount }}
+CPU	{{ printf "%.1f%%" .Resources.CpuPercent }}
+MEMORY	{{ printf "%s (%.1f%%)" (formatBytes .Resources.MemoryBytes) .Resources.MemoryPercent }}
+STARTED AT	{{ formatTime .StartedAt }}
+EXIT CODE	{{ .ExitCode }}
+OOM KILLED	{{ .OomKilled }}
+RESTART POLICY	{{ string .RestartPolicy }}
+PRIVILEGED	{{ .Privileged }}
+MEMORY LIMIT	{{ if gt .MemoryLimit 0 }}{{ formatBytes .MemoryLimit }}{{ else }}unlimited{{ end }}
+{{- if .PortBindings }}
+{{ flush }}
+PORT BINDINGS
+CONTAINER PORT	HOST PORT	PROTOCOL
+{{ range .PortBindings -}}
+{{ .ContainerPort }}	{{ .HostPort }}	{{ string .Protocol }}
+{{ end -}}
+{{- end }}
+{{- if .Networks }}
+{{ flush }}
+NETWORKS
+NAME	DRIVER
+{{ range .Networks -}}
+{{ .Name }}	{{ .Driver }}
+{{ end -}}
+{{- end }}
+{{- if .VolumeBindings }}
+{{ flush }}
+VOLUME BINDINGS
+SOURCE	DESTINATION	MODE
+{{ range .VolumeBindings -}}
+{{ .Source }}	{{ .Destination }}	{{ string .Mode }}
+{{ end -}}
+{{- end }}
+{{- if .EnvVariables }}
+{{ flush }}
+ENVIRONMENT VARIABLES
+KEY	VALUE
+{{ range .EnvVariables -}}
+{{ .Key }}	{{ .Value }}
+{{ end -}}
+{{- end }}
+{{- if .Entrypoint }}
+{{ flush }}
+ENTRYPOINT
+{{ range .Entrypoint -}}
+  {{ . }}
+{{ end -}}
+{{- end }}
+{{- if .Cmd }}
+{{ flush }}
+COMMAND
+{{ range .Cmd -}}
+  {{ . }}
+{{ end -}}
+{{- end }}
+{{- if sortedPairs .Labels }}
+{{ flush }}
+LABELS
+KEY	VALUE
+{{ range sortedPairs .Labels -}}
+{{ index . 0 }}	{{ index . 1 }}
+{{ end -}}
+{{- end }}

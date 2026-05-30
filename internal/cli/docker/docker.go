@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
-	"strings"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
@@ -83,19 +81,7 @@ func newListCmd(client DockerClient) *cobra.Command {
 			return nil
 		}
 
-		list := resp.JSON200
-		headers := []string{"ID", "IMAGE", "STATUS", "CPU", "MEMORY"}
-		var rows [][]string
-		for _, c := range list.Items {
-			rows = append(rows, []string{
-				c.Id,
-				c.Image,
-				string(c.Status),
-				fmt.Sprintf("%.1f%%", c.Resources.CpuPercent),
-				output.FormatBytes(c.Resources.MemoryBytes),
-			})
-		}
-		return output.Print(w, flags.GetOutputFormat(), list, headers, rows)
+		return output.RenderTemplate(w, dockerTemplates, "containers_list.tmpl", *resp.JSON200)
 	})
 
 	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
@@ -131,124 +117,9 @@ func newGetCmd(client DockerClient) *cobra.Command {
 				return nil
 			}
 
-			return printContainerDetail(cmd, *resp.JSON200)
+			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "containers_get.tmpl", *resp.JSON200)
 		},
 	}
-}
-
-func printContainerDetail(cmd *cobra.Command, d gen.ContainerDetail) error {
-	w := cmd.OutOrStdout()
-
-	memoryLimit := "unlimited"
-	if d.MemoryLimit > 0 {
-		memoryLimit = output.FormatBytes(d.MemoryLimit)
-	}
-
-	headers := []string{"FIELD", "VALUE"}
-	rows := [][]string{
-		{"ID", d.Id},
-		{"NAME", d.Name},
-		{"DEVICE", d.Device},
-		{"STATUS", string(d.Status)},
-		{"IMAGE", d.Image},
-		{"RESTART COUNT", fmt.Sprintf("%d", d.RestartCount)},
-		{"CPU", fmt.Sprintf("%.1f%%", d.Resources.CpuPercent)},
-		{"MEMORY", fmt.Sprintf("%s (%.1f%%)", output.FormatBytes(d.Resources.MemoryBytes), d.Resources.MemoryPercent)},
-		{"STARTED AT", output.FormatTime(d.StartedAt)},
-		{"EXIT CODE", fmt.Sprintf("%d", d.ExitCode)},
-		{"OOM KILLED", fmt.Sprintf("%v", d.OomKilled)},
-		{"RESTART POLICY", string(d.RestartPolicy)},
-		{"PRIVILEGED", fmt.Sprintf("%v", d.Privileged)},
-		{"MEMORY LIMIT", memoryLimit},
-	}
-	if err := output.Print(w, output.FormatTable, nil, headers, rows); err != nil {
-		return err
-	}
-
-	if len(d.PortBindings) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "PORT BINDINGS")
-		var pbRows [][]string
-		for _, pb := range d.PortBindings {
-			pbRows = append(pbRows, []string{
-				fmt.Sprintf("%d", pb.ContainerPort),
-				fmt.Sprintf("%d", pb.HostPort),
-				string(pb.Protocol),
-			})
-		}
-		if err := output.Print(w, output.FormatTable, nil, []string{"CONTAINER PORT", "HOST PORT", "PROTOCOL"}, pbRows); err != nil {
-			return err
-		}
-	}
-
-	if len(d.Networks) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "NETWORKS")
-		var netRows [][]string
-		for _, n := range d.Networks {
-			netRows = append(netRows, []string{n.Name, n.Driver})
-		}
-		if err := output.Print(w, output.FormatTable, nil, []string{"NAME", "DRIVER"}, netRows); err != nil {
-			return err
-		}
-	}
-
-	if len(d.VolumeBindings) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "VOLUME BINDINGS")
-		var volRows [][]string
-		for _, v := range d.VolumeBindings {
-			volRows = append(volRows, []string{v.Source, v.Destination, string(v.Mode)})
-		}
-		if err := output.Print(w, output.FormatTable, nil, []string{"SOURCE", "DESTINATION", "MODE"}, volRows); err != nil {
-			return err
-		}
-	}
-
-	if len(d.EnvVariables) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "ENVIRONMENT VARIABLES")
-		var envRows [][]string
-		for _, e := range d.EnvVariables {
-			envRows = append(envRows, []string{e.Key, e.Value})
-		}
-		if err := output.Print(w, output.FormatTable, nil, []string{"KEY", "VALUE"}, envRows); err != nil {
-			return err
-		}
-	}
-
-	if len(d.Entrypoint) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "ENTRYPOINT")
-		for _, e := range d.Entrypoint {
-			fmt.Fprintln(w, " ", e)
-		}
-	}
-
-	if len(d.Cmd) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "COMMAND")
-		for _, c := range d.Cmd {
-			fmt.Fprintln(w, " ", c)
-		}
-	}
-
-	if d.Labels != nil && len(*d.Labels) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "LABELS")
-		var labelRows [][]string
-		for k, v := range *d.Labels {
-			labelRows = append(labelRows, []string{k, v})
-		}
-		sort.Slice(labelRows, func(i, j int) bool {
-			return labelRows[i][0] < labelRows[j][0]
-		})
-		if err := output.Print(w, output.FormatTable, nil, []string{"KEY", "VALUE"}, labelRows); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func newStartCmd(client DockerClient) *cobra.Command {
@@ -376,16 +247,7 @@ func newListNetworksCmd(client DockerClient) *cobra.Command {
 				return nil
 			}
 
-			list := resp.JSON200
-			headers := []string{"ID", "NAME", "DEVICE", "CONTAINERS"}
-			var rows [][]string
-			for _, n := range list.Items {
-				rows = append(rows, []string{
-					n.Id, n.Name, n.Device,
-					fmt.Sprintf("%d", n.ConnectedContainers),
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "networks_list.tmpl", *resp.JSON200)
 		},
 	}
 
@@ -421,46 +283,9 @@ func newGetNetworkCmd(client DockerClient) *cobra.Command {
 				return nil
 			}
 
-			return printNetworkDetail(cmd, *resp.JSON200)
+			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "networks_get.tmpl", *resp.JSON200)
 		},
 	}
-}
-
-func printNetworkDetail(cmd *cobra.Command, d gen.DockerNetworkDetail) error {
-	w := cmd.OutOrStdout()
-
-	headers := []string{"FIELD", "VALUE"}
-	rows := [][]string{
-		{"ID", d.Id},
-		{"NAME", d.Name},
-		{"DEVICE", d.Device},
-		{"DRIVER", d.Driver},
-		{"CONTAINERS", fmt.Sprintf("%d", d.ConnectedContainers)},
-	}
-	// subnet and gateway are optional (no IPAM on host/macvlan networks)
-	if d.Subnet != nil {
-		rows = append(rows, []string{"SUBNET", *d.Subnet})
-	}
-	if d.Gateway != nil {
-		rows = append(rows, []string{"GATEWAY", *d.Gateway})
-	}
-	if err := output.Print(w, output.FormatTable, nil, headers, rows); err != nil {
-		return err
-	}
-
-	if len(d.Containers) > 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "CONNECTED CONTAINERS")
-		var rows [][]string
-		for _, name := range d.Containers {
-			rows = append(rows, []string{name})
-		}
-		if err := output.Print(w, output.FormatTable, nil, []string{"NAME"}, rows); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func newImagesCmd() *cobra.Command {
@@ -507,19 +332,7 @@ func newListImagesCmd(client DockerClient) *cobra.Command {
 				return nil
 			}
 
-			list := resp.JSON200
-			headers := []string{"ID", "DEVICE", "REPOSITORY", "TAGS", "SIZE"}
-			var rows [][]string
-			for _, img := range list.Items {
-				rows = append(rows, []string{
-					img.Id,
-					img.Device,
-					img.Repository,
-					strings.Join(img.Tags, ", "),
-					output.FormatBytes(img.Size),
-				})
-			}
-			return output.Print(cmd.OutOrStdout(), flags.GetOutputFormat(), list, headers, rows)
+			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "images_list.tmpl", *resp.JSON200)
 		},
 	}
 
@@ -555,25 +368,8 @@ func newGetImageCmd(client DockerClient) *cobra.Command {
 				return nil
 			}
 
-			return printImageDetail(cmd, *resp.JSON200)
+			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "images_get.tmpl", *resp.JSON200)
 		},
 	}
 }
 
-func printImageDetail(cmd *cobra.Command, d gen.DockerImageDetail) error {
-	w := cmd.OutOrStdout()
-
-	headers := []string{"FIELD", "VALUE"}
-	rows := [][]string{
-		{"ID", d.Id},
-		{"DEVICE", d.Device},
-		{"REPOSITORY", d.Repository},
-		{"TAGS", strings.Join(d.Tags, ", ")},
-		{"SIZE", output.FormatBytes(d.Size)},
-		{"VIRTUAL SIZE", output.FormatBytes(d.VirtualSize)},
-	}
-	if !d.Created.IsZero() {
-		rows = append(rows, []string{"CREATED", output.FormatTime(d.Created)})
-	}
-	return output.Print(w, output.FormatTable, nil, headers, rows)
-}

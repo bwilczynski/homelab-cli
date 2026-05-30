@@ -58,8 +58,6 @@ func okImageResp(detail gen.DockerImageDetail) *gen.GetDockerImageResponse {
 	return &gen.GetDockerImageResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
 }
 
-func strPtr(s string) *string { return &s }
-
 func TestListContainersCmd_tableOutput(t *testing.T) {
 	list := gen.ContainerList{
 		Items: []gen.Container{

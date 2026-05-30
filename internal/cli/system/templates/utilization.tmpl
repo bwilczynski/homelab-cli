@@ -1,0 +1,4 @@
+DEVICE	CPU	MEMORY	SWAP
+{{ range .Items -}}
+{{ .Device }}	{{ .Cpu }}	{{ .Memory }}	{{ .Swap }}
+{{ end -}}
