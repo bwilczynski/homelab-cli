@@ -2,26 +2,27 @@ package docker
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	gen "github.com/bwilczynski/hlctl/internal/docker"
-	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
+var (
+	containersListView = cmdutil.View{Templates: dockerTemplates, Name: "containers_list.tmpl"}
+	containersGetView  = cmdutil.View{Templates: dockerTemplates, Name: "containers_get.tmpl"}
+	networksListView   = cmdutil.View{Templates: dockerTemplates, Name: "networks_list.tmpl"}
+	networksGetView    = cmdutil.View{Templates: dockerTemplates, Name: "networks_get.tmpl"}
+	imagesListView     = cmdutil.View{Templates: dockerTemplates, Name: "images_list.tmpl"}
+	imagesGetView      = cmdutil.View{Templates: dockerTemplates, Name: "images_get.tmpl"}
+)
+
 func NewCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "docker",
-		Short: "Docker resources",
-	}
-	cmd.AddCommand(newContainersCmd())
-	cmd.AddCommand(newNetworksCmd())
-	cmd.AddCommand(newImagesCmd())
+	cmd := &cobra.Command{Use: "docker", Short: "Docker resources"}
+	cmd.AddCommand(newContainersCmd(), newNetworksCmd(), newImagesCmd())
 	return cmd
 }
 
@@ -33,343 +34,150 @@ func buildClient() (DockerClient, error) {
 	return NewDockerClient(httpClient, apiURL)
 }
 
+// --- containers ---
+
 func newContainersCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "containers",
-		Short: "Manage Docker containers",
-	}
-	cmd.AddCommand(newListCmd(nil))
-	cmd.AddCommand(newGetCmd(nil))
-	cmd.AddCommand(newStartCmd(nil))
-	cmd.AddCommand(newStopCmd(nil))
-	cmd.AddCommand(newRestartCmd(nil))
+	cmd := &cobra.Command{Use: "containers", Short: "Manage Docker containers"}
+	cmdutil.InjectClient(cmd, buildClient)
+	cmd.AddCommand(newListCmd(), newGetCmd(), newStartCmd(), newStopCmd(), newRestartCmd())
 	return cmd
 }
 
-func newListCmd(client DockerClient) *cobra.Command {
-	var device string
-
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List containers",
-	}
+func newListCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "list", Short: "List containers"}
+	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		c := client
-		if c == nil {
-			var err error
-			c, err = buildClient()
-			if err != nil {
-				return err
-			}
-		}
-
 		params := &gen.ListContainersParams{}
-		if device != "" {
-			params.Device = &device
+		if *device != "" {
+			params.Device = device
 		}
-
-		resp, err := c.ListContainersWithResponse(ctx, params)
+		resp, err := cmdutil.Client[DockerClient](cmd).ListContainersWithResponse(ctx, params)
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return apiclient.ParseError(resp.StatusCode(), resp.Body)
-		}
-
-		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(resp.Body))
-			return nil
-		}
-
-		return output.RenderTemplate(w, dockerTemplates, "containers_list.tmpl", *resp.JSON200)
+		return containersListView.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)
 	})
-
-	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
 	watch.RegisterFlags(cmd)
 	return cmd
 }
 
-func newGetCmd(client DockerClient) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <container-id>",
-		Short: "Show container details",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			resp, err := c.GetContainerWithResponse(context.Background(), args[0])
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "containers_get.tmpl", *resp.JSON200)
-		},
+func newGetCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "get <container-id>", Short: "Show container details", Args: cobra.ExactArgs(1)}
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		resp, err := cmdutil.Client[DockerClient](cmd).GetContainerWithResponse(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		return containersGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
+	return cmd
 }
 
-func newStartCmd(client DockerClient) *cobra.Command {
-	return &cobra.Command{
-		Use:   "start <container-id>",
-		Short: "Start a container",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-			resp, err := c.StartContainerWithResponse(context.Background(), args[0], &gen.StartContainerParams{})
+func newStartCmd() *cobra.Command {
+	return cmdutil.ActionCmd("start <container-id>", "Start a container", "started",
+		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
+			r, err := c.StartContainerWithResponse(ctx, id, &gen.StartContainerParams{})
 			if err != nil {
-				return err
+				return 0, nil, err
 			}
-			if resp.StatusCode() != http.StatusNoContent {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Container %s started\n", args[0])
-			return nil
-		},
-	}
+			return r.StatusCode(), r.Body, nil
+		})
 }
 
-func newStopCmd(client DockerClient) *cobra.Command {
-	return &cobra.Command{
-		Use:   "stop <container-id>",
-		Short: "Stop a container",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-			resp, err := c.StopContainerWithResponse(context.Background(), args[0], &gen.StopContainerParams{})
+func newStopCmd() *cobra.Command {
+	return cmdutil.ActionCmd("stop <container-id>", "Stop a container", "stopped",
+		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
+			r, err := c.StopContainerWithResponse(ctx, id, &gen.StopContainerParams{})
 			if err != nil {
-				return err
+				return 0, nil, err
 			}
-			if resp.StatusCode() != http.StatusNoContent {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Container %s stopped\n", args[0])
-			return nil
-		},
-	}
+			return r.StatusCode(), r.Body, nil
+		})
 }
 
-func newRestartCmd(client DockerClient) *cobra.Command {
-	return &cobra.Command{
-		Use:   "restart <container-id>",
-		Short: "Restart a container",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-			resp, err := c.RestartContainerWithResponse(context.Background(), args[0], &gen.RestartContainerParams{})
+func newRestartCmd() *cobra.Command {
+	return cmdutil.ActionCmd("restart <container-id>", "Restart a container", "restarted",
+		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
+			r, err := c.RestartContainerWithResponse(ctx, id, &gen.RestartContainerParams{})
 			if err != nil {
-				return err
+				return 0, nil, err
 			}
-			if resp.StatusCode() != http.StatusNoContent {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Container %s restarted\n", args[0])
-			return nil
-		},
-	}
+			return r.StatusCode(), r.Body, nil
+		})
 }
+
+// --- networks ---
 
 func newNetworksCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "networks",
-		Short: "Docker networks",
-	}
-	cmd.AddCommand(newListNetworksCmd(nil))
-	cmd.AddCommand(newGetNetworkCmd(nil))
+	cmd := &cobra.Command{Use: "networks", Short: "Docker networks"}
+	cmdutil.InjectClient(cmd, buildClient)
+	cmd.AddCommand(newListNetworksCmd(), newGetNetworkCmd())
 	return cmd
 }
 
-func newListNetworksCmd(client DockerClient) *cobra.Command {
-	var device string
-
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List Docker networks",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			params := &gen.ListDockerNetworksParams{}
-			if device != "" {
-				params.Device = &device
-			}
-
-			resp, err := c.ListDockerNetworksWithResponse(context.Background(), params)
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "networks_list.tmpl", *resp.JSON200)
-		},
+func newListNetworksCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "list", Short: "List Docker networks"}
+	device := cmdutil.DeviceFlag(cmd)
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		params := &gen.ListDockerNetworksParams{}
+		if *device != "" {
+			params.Device = device
+		}
+		resp, err := cmdutil.Client[DockerClient](cmd).ListDockerNetworksWithResponse(cmd.Context(), params)
+		if err != nil {
+			return err
+		}
+		return networksListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
-
-	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
 	return cmd
 }
 
-func newGetNetworkCmd(client DockerClient) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <network-id>",
-		Short: "Show network details",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			resp, err := c.GetDockerNetworkWithResponse(context.Background(), args[0])
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "networks_get.tmpl", *resp.JSON200)
-		},
+func newGetNetworkCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "get <network-id>", Short: "Show network details", Args: cobra.ExactArgs(1)}
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		resp, err := cmdutil.Client[DockerClient](cmd).GetDockerNetworkWithResponse(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		return networksGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
+	return cmd
 }
+
+// --- images ---
 
 func newImagesCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "images",
-		Short: "Docker images",
-	}
-	cmd.AddCommand(newListImagesCmd(nil))
-	cmd.AddCommand(newGetImageCmd(nil))
+	cmd := &cobra.Command{Use: "images", Short: "Docker images"}
+	cmdutil.InjectClient(cmd, buildClient)
+	cmd.AddCommand(newListImagesCmd(), newGetImageCmd())
 	return cmd
 }
 
-func newListImagesCmd(client DockerClient) *cobra.Command {
-	var device string
-
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List Docker images",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			params := &gen.ListDockerImagesParams{}
-			if device != "" {
-				params.Device = &device
-			}
-
-			resp, err := c.ListDockerImagesWithResponse(context.Background(), params)
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "images_list.tmpl", *resp.JSON200)
-		},
+func newListImagesCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "list", Short: "List Docker images"}
+	device := cmdutil.DeviceFlag(cmd)
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		params := &gen.ListDockerImagesParams{}
+		if *device != "" {
+			params.Device = device
+		}
+		resp, err := cmdutil.Client[DockerClient](cmd).ListDockerImagesWithResponse(cmd.Context(), params)
+		if err != nil {
+			return err
+		}
+		return imagesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
-
-	cmd.Flags().StringVar(&device, "device", "", "Filter by device ID")
 	return cmd
 }
 
-func newGetImageCmd(client DockerClient) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <image-id>",
-		Short: "Show image details",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			resp, err := c.GetDockerImageWithResponse(context.Background(), args[0])
-			if err != nil {
-				return err
-			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), dockerTemplates, "images_get.tmpl", *resp.JSON200)
-		},
+func newGetImageCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "get <image-id>", Short: "Show image details", Args: cobra.ExactArgs(1)}
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		resp, err := cmdutil.Client[DockerClient](cmd).GetDockerImageWithResponse(cmd.Context(), args[0])
+		if err != nil {
+			return err
+		}
+		return imagesGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
+	return cmd
 }
-

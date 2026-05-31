@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	gen "github.com/bwilczynski/hlctl/internal/network"
 )
@@ -157,7 +158,8 @@ func TestListDevicesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListDevicesCmd(stub)
+	cmd := newListDevicesCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -187,7 +189,8 @@ func TestListDevicesCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListDevicesCmd(stub)
+	cmd := newListDevicesCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -215,7 +218,8 @@ func TestGetDeviceCmd_gateway(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd(stub)
+	cmd := newGetDeviceCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.usg"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -255,7 +259,8 @@ func TestListClientsCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListClientsCmd(stub)
+	cmd := newListClientsCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -286,7 +291,8 @@ func TestGetClientCmd_wired(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd(stub)
+	cmd := newGetClientCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:01"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -324,7 +330,8 @@ func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd(stub)
+	cmd := newGetDeviceCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.mystery"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -367,7 +374,8 @@ func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd(stub)
+	cmd := newGetDeviceCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.switch-lr"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -403,7 +411,8 @@ func TestGetDeviceCmd_switch_allPorts(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd(stub)
+	cmd := newGetDeviceCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.switch-lr", "--all-ports"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -438,7 +447,8 @@ func TestGetDeviceCmd_accessPoint(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd(stub)
+	cmd := newGetDeviceCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.ap-living-room"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -472,7 +482,8 @@ func TestGetClientCmd_wireless(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd(stub)
+	cmd := newGetClientCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:02"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -504,7 +515,8 @@ func TestGetClientCmd_offline_wired(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd(stub)
+	cmd := newGetClientCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:03"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -539,7 +551,8 @@ func TestGetClientCmd_offline_wireless(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd(stub)
+	cmd := newGetClientCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:04"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -571,7 +584,8 @@ func TestListClientsCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListClientsCmd(stub)
+	cmd := newListClientsCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -593,7 +607,8 @@ func TestListClientsCmd_statusFilter(t *testing.T) {
 		},
 	}
 
-	cmd := newListClientsCmd(stub)
+	cmd := newListClientsCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"--status", "online"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -621,7 +636,8 @@ func TestGetClientCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd(stub)
+	cmd := newGetClientCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -675,7 +691,8 @@ func TestTopologyCmd_devicesOnly(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd(stub)
+	cmd := newTopologyCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -745,7 +762,8 @@ func TestTopologyCmd_includeClientsWiredOnly(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd(stub)
+	cmd := newTopologyCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"--include-clients"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -799,7 +817,8 @@ func TestTopologyCmd_includeWireless(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd(stub)
+	cmd := newTopologyCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"--include-wireless"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -830,7 +849,8 @@ func TestTopologyCmd_jsonOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd(stub)
+	cmd := newTopologyCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -856,7 +876,8 @@ func TestTopologyCmd_apiError(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd(stub)
+	cmd := newTopologyCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -880,7 +901,8 @@ func TestListVlansCmd_tableOutput(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListVlansCmd(stub)
+	cmd := newListVlansCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -904,7 +926,8 @@ func TestListVlansCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListVlansCmd(stub)
+	cmd := newListVlansCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -930,7 +953,8 @@ func TestGetVlanCmd_serverDhcp(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd(stub)
+	cmd := newGetVlanCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.iot"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -961,7 +985,8 @@ func TestGetVlanCmd_relayDhcp(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd(stub)
+	cmd := newGetVlanCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.mgmt"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -989,7 +1014,8 @@ func TestGetVlanCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd(stub)
+	cmd := newGetVlanCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -1015,7 +1041,8 @@ func TestGetVlanCmd_disabledDhcp(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd(stub)
+	cmd := newGetVlanCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.servers"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -1055,7 +1082,8 @@ func TestListSsidsCmd_tableOutput(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListSsidsCmd(stub)
+	cmd := newListSsidsCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -1079,7 +1107,8 @@ func TestListSsidsCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListSsidsCmd(stub)
+	cmd := newListSsidsCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -1111,7 +1140,8 @@ func TestGetSsidCmd_withClients(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetSsidCmd(stub)
+	cmd := newGetSsidCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.iot"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -1136,7 +1166,8 @@ func TestGetSsidCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetSsidCmd(stub)
+	cmd := newGetSsidCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -1161,7 +1192,8 @@ func TestListWansCmd_tableOutput(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListWansCmd(stub)
+	cmd := newListWansCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -1185,7 +1217,8 @@ func TestListWansCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListWansCmd(stub)
+	cmd := newListWansCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -1209,7 +1242,8 @@ func TestGetWanCmd_connected(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetWanCmd(stub)
+	cmd := newGetWanCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.wan1"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -1234,7 +1268,8 @@ func TestGetWanCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetWanCmd(stub)
+	cmd := newGetWanCmd()
+	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)

@@ -9,12 +9,12 @@ import (
 //go:embed templates
 var embeddedTemplates embed.FS
 
-var systemTemplates fs.FS
+var systemTemplates = mustSubFS(embeddedTemplates, "templates")
 
-func init() {
-	var err error
-	systemTemplates, err = fs.Sub(embeddedTemplates, "templates")
+func mustSubFS(f fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(f, dir)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create system templates FS: %v", err))
 	}
+	return sub
 }

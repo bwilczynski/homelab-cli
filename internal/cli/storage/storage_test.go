@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	gen "github.com/bwilczynski/hlctl/internal/storage"
 )
 
@@ -72,7 +73,8 @@ func TestListVolumesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListVolumesCmd(stub)
+	cmd := newListVolumesCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -99,7 +101,8 @@ func TestListVolumesCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListVolumesCmd(stub)
+	cmd := newListVolumesCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -131,7 +134,8 @@ func TestGetVolumeCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetVolumeCmd(stub)
+	cmd := newGetVolumeCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.volume1"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -169,7 +173,8 @@ func TestListBackupsCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListBackupsCmd(stub)
+	cmd := newListBackupsCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -196,7 +201,8 @@ func TestListBackupsCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListBackupsCmd(stub)
+	cmd := newListBackupsCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -228,7 +234,8 @@ func TestGetBackupCmd_withDates(t *testing.T) {
 		},
 	}
 
-	cmd := newGetBackupCmd(stub)
+	cmd := newGetBackupCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.daily-backup"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -264,7 +271,8 @@ func TestGetBackupCmd_withSizeAndFolders(t *testing.T) {
 		},
 	}
 
-	cmd := newGetBackupCmd(stub)
+	cmd := newGetBackupCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.daily-backup"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -292,7 +300,8 @@ func TestGetBackupCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetBackupCmd(stub)
+	cmd := newGetBackupCmd()
+	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.foo"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
