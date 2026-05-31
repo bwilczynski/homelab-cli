@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	gen "github.com/bwilczynski/hlctl/internal/network"
 	"github.com/bwilczynski/hlctl/internal/output"
@@ -18,6 +16,7 @@ import (
 var (
 	devicesListView = cmdutil.View{Templates: networkTemplates, Name: "devices_list.tmpl"}
 	clientsListView = cmdutil.View{Templates: networkTemplates, Name: "clients_list.tmpl"}
+	topologyView    = cmdutil.View{Templates: networkTemplates, Name: "topology.tmpl"}
 )
 
 var clientGetView = cmdutil.PolymorphicView[gen.NetworkClientDetail]{
@@ -266,20 +265,9 @@ func newTopologyCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return apiclient.ParseError(resp.StatusCode(), resp.Body)
-		}
-
-		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(resp.Body))
-			return nil
-		}
-
-		tree, err := buildTopologyTree(*resp.JSON200, includeWireless)
-		if err != nil {
-			return err
-		}
-		return output.RenderTemplate(w, networkTemplates, "topology.tmpl", tree)
+		return topologyView.RenderWith(w, resp.StatusCode(), resp.Body, func() (any, error) {
+			return buildTopologyTree(*resp.JSON200, includeWireless)
+		})
 	})
 
 	cmd.Flags().BoolVar(&includeClients, "include-clients", false, "Include wired clients in the topology")
