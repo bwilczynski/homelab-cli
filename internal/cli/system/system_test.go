@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	gen "github.com/bwilczynski/hlctl/internal/system"
 )
 
@@ -70,7 +71,8 @@ func TestHealthCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newHealthCmd(stub)
+	cmd := newHealthCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -98,7 +100,8 @@ func TestHealthCmd_apiError(t *testing.T) {
 		},
 	}
 
-	cmd := newHealthCmd(stub)
+	cmd := newHealthCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -128,7 +131,8 @@ func TestInfoCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newInfoCmd(stub)
+	cmd := newInfoCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -164,7 +168,8 @@ func TestUtilizationCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newUtilizationCmd(stub)
+	cmd := newUtilizationCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -200,7 +205,8 @@ func TestListUpdatesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListUpdatesCmd(stub)
+	cmd := newListUpdatesCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
@@ -236,7 +242,8 @@ func TestGetUpdateCmd_containerType(t *testing.T) {
 		},
 	}
 
-	cmd := newGetUpdateCmd(stub)
+	cmd := newGetUpdateCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -269,7 +276,8 @@ func TestGetUpdateCmd_apiError(t *testing.T) {
 		},
 	}
 
-	cmd := newGetUpdateCmd(stub)
+	cmd := newGetUpdateCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.foo"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -303,7 +311,8 @@ func TestCheckUpdatesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newCheckUpdatesCmd(stub)
+	cmd := newCheckUpdatesCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
