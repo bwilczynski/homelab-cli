@@ -141,6 +141,7 @@ func newGetDeviceCmd() *cobra.Command {
 		Short: "Show network device details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Inline so the "switch" Resolve closure can capture the --all-ports flag.
 			view := cmdutil.PolymorphicView[gen.NetworkDeviceDetail]{
 				Templates: networkTemplates,
 				Variants: map[string]cmdutil.Variant[gen.NetworkDeviceDetail]{
