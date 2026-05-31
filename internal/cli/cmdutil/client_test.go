@@ -2,6 +2,8 @@ package cmdutil_test
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
@@ -83,6 +85,22 @@ func TestSetClient_preservesExistingContextValues(t *testing.T) {
 	if cmdutil.Client[*fakeClient](leaf).name != "stub" {
 		t.Error("expected client also seeded")
 	}
+}
+
+func TestClient_panicsWithDiagnosticWhenMissing(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic when no client is injected")
+		}
+		msg := fmt.Sprint(r)
+		if !strings.Contains(msg, "no client injected") {
+			t.Errorf("expected diagnostic message, got %q", msg)
+		}
+	}()
+	cmd := &cobra.Command{Use: "test"}
+	cmd.SetContext(context.Background())
+	_ = cmdutil.Client[*fakeClient](cmd)
 }
 
 var errBoom = stringError("boom")

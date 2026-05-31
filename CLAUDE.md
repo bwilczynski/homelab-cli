@@ -32,6 +32,7 @@ make build
 - `cmd/hlctl/` — entrypoint
 - `internal/cli/` — Cobra command tree, root command
 - `internal/cli/flags/` — shared global flags (output format, api-url)
+- `internal/cli/cmdutil/` — shared command-construction helpers (client injection, View renderer, ActionCmd factory, DeviceFlag)
 - `internal/cli/<domain>/` — per-domain command packages (containers, system, storage, backups, network, config, login)
 - `internal/<domain>/` — generated oapi-codegen client code (gitignored)
 - `internal/config/` — config file read/write (`~/.config/homelab/`)
@@ -54,6 +55,7 @@ make build
 6. Start/stop/restart-style commands (204 No Content + success message) use `cmdutil.ActionCmd[<Domain>Client](use, short, pastTense, exec)`.
 7. Register the new domain in `internal/cli/root.go` via `rootCmd.AddCommand(<domain>.NewCmd())`.
 8. Tests construct leaves directly and seed the client via `cmdutil.SetClient[<Domain>Client](cmd, stub)`.
+9. For polymorphic responses (discriminated unions like `NetworkDeviceDetail`, `SystemUpdateDetail`), keep the status check + JSON branch inline (still using `flags.GetOutputFormat`) and call `output.RenderTemplate` directly with the resolved variant's template. `cmdutil.View.Render` cannot dispatch on a discriminator.
 
 ## Adding a New oapi-codegen Domain
 
