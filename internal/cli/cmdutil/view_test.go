@@ -158,6 +158,36 @@ func TestView_RenderWith_fnErrorPropagates(t *testing.T) {
 	}
 }
 
+func TestView_RenderWith_customStatus(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "table"
+
+	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl", Status: http.StatusCreated}
+	var buf bytes.Buffer
+	err := v.RenderWith(&buf, http.StatusCreated, []byte(`{"name":"new"}`), func() (any, error) {
+		return greet{Name: "new"}, nil
+	})
+	if err != nil {
+		t.Fatalf("RenderWith 201: %v", err)
+	}
+	if got := buf.String(); got != "hello new\n" {
+		t.Errorf("unexpected output: %q", got)
+	}
+
+	// 200 should now be treated as a mismatch.
+	called := 0
+	err = v.RenderWith(&bytes.Buffer{}, http.StatusOK, []byte(`{"title":"oops"}`), func() (any, error) {
+		called++
+		return nil, nil
+	})
+	if err == nil {
+		t.Fatal("expected error when status differs from configured Status")
+	}
+	if called != 0 {
+		t.Errorf("expected fn NOT called on status mismatch, got %d invocations", called)
+	}
+}
+
 type fakeUnion struct {
 	Kind string
 	Data string
