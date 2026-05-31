@@ -69,3 +69,52 @@ func (v View) RenderWith(w io.Writer, statusCode int, body []byte, fn func() (an
 	}
 	return output.RenderTemplate(w, v.Templates, v.Name, data)
 }
+
+// Discriminator constrains polymorphic response bodies. Oapi-codegen union
+// types satisfy this automatically — each generated *Detail struct has a
+// Discriminator() (string, error) method.
+type Discriminator interface {
+	Discriminator() (string, error)
+}
+
+// Variant binds one discriminator branch to its template and a resolver that
+// extracts the typed variant (and optionally transforms it) from the union.
+type Variant[T Discriminator] struct {
+	Template string
+	Resolve  func(T) (any, error)
+}
+
+// PolymorphicView is the View equivalent for discriminated-union responses.
+// Variants is keyed by the discriminator string returned by T.Discriminator().
+// Status defaults to http.StatusOK.
+type PolymorphicView[T Discriminator] struct {
+	Templates fs.FS
+	Status    int
+	Variants  map[string]Variant[T]
+}
+
+// Render handles the status check + JSON shortcut, then dispatches on
+// detail.Discriminator() to look up the variant template and resolved data.
+func (v PolymorphicView[T]) Render(w io.Writer, statusCode int, body []byte, detail *T) error {
+	handled, err := renderHead(w, v.Status, statusCode, body)
+	if handled || err != nil {
+		return err
+	}
+	if detail == nil {
+		var zero T
+		return fmt.Errorf("nil %T body", zero)
+	}
+	disc, err := (*detail).Discriminator()
+	if err != nil {
+		return err
+	}
+	variant, ok := v.Variants[disc]
+	if !ok {
+		return fmt.Errorf("unknown %T discriminator: %q", *detail, disc)
+	}
+	data, err := variant.Resolve(*detail)
+	if err != nil {
+		return err
+	}
+	return output.RenderTemplate(w, v.Templates, variant.Template, data)
+}

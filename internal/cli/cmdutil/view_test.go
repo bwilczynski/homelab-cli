@@ -157,3 +157,159 @@ func TestView_RenderWith_fnErrorPropagates(t *testing.T) {
 		t.Errorf("expected fn error to propagate, got %v", err)
 	}
 }
+
+type fakeUnion struct {
+	Kind string
+	Data string
+}
+
+func (u fakeUnion) Discriminator() (string, error) {
+	if u.Kind == "" {
+		return "", errors.New("missing discriminator")
+	}
+	return u.Kind, nil
+}
+
+func polyTemplates() fstest.MapFS {
+	return fstest.MapFS{
+		"a.tmpl": &fstest.MapFile{Data: []byte("A: {{.}}\n")},
+		"b.tmpl": &fstest.MapFile{Data: []byte("B: {{.}}\n")},
+	}
+}
+
+func newPolyView() cmdutil.PolymorphicView[fakeUnion] {
+	return cmdutil.PolymorphicView[fakeUnion]{
+		Templates: polyTemplates(),
+		Variants: map[string]cmdutil.Variant[fakeUnion]{
+			"a": {Template: "a.tmpl", Resolve: func(u fakeUnion) (any, error) { return u.Data, nil }},
+			"b": {Template: "b.tmpl", Resolve: func(u fakeUnion) (any, error) { return u.Data, nil }},
+		},
+	}
+}
+
+func TestPolymorphicView_dispatchesToVariant(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "table"
+
+	v := newPolyView()
+
+	var bufA bytes.Buffer
+	if err := v.Render(&bufA, http.StatusOK, []byte(`{"kind":"a"}`), &fakeUnion{Kind: "a", Data: "alpha"}); err != nil {
+		t.Fatalf("Render a: %v", err)
+	}
+	if got := bufA.String(); got != "A: alpha\n" {
+		t.Errorf("variant a output: %q", got)
+	}
+
+	var bufB bytes.Buffer
+	if err := v.Render(&bufB, http.StatusOK, []byte(`{"kind":"b"}`), &fakeUnion{Kind: "b", Data: "beta"}); err != nil {
+		t.Fatalf("Render b: %v", err)
+	}
+	if got := bufB.String(); got != "B: beta\n" {
+		t.Errorf("variant b output: %q", got)
+	}
+}
+
+func TestPolymorphicView_jsonModeSkipsDiscriminator(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "json"
+
+	v := newPolyView()
+	body := []byte(`{"kind":"a","data":"alpha"}`)
+	var buf bytes.Buffer
+	// Kind is empty — would error out of Discriminator() if called.
+	if err := v.Render(&buf, http.StatusOK, body, &fakeUnion{}); err != nil {
+		t.Fatalf("Render json: %v", err)
+	}
+	if buf.String() != string(body) {
+		t.Errorf("expected raw body, got %q", buf.String())
+	}
+}
+
+func TestPolymorphicView_statusMismatch(t *testing.T) {
+	v := newPolyView()
+	err := v.Render(&bytes.Buffer{}, http.StatusNotFound, []byte(`{"title":"Not Found"}`), &fakeUnion{Kind: "a"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "Not Found") {
+		t.Errorf("expected ParseError output, got %v", err)
+	}
+}
+
+func TestPolymorphicView_customStatus(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "table"
+
+	v := newPolyView()
+	v.Status = http.StatusCreated
+
+	var buf bytes.Buffer
+	if err := v.Render(&buf, http.StatusCreated, []byte(`{}`), &fakeUnion{Kind: "a", Data: "alpha"}); err != nil {
+		t.Fatalf("Render 201: %v", err)
+	}
+	if got := buf.String(); got != "A: alpha\n" {
+		t.Errorf("custom status output: %q", got)
+	}
+
+	// 200 should now be treated as a mismatch.
+	if err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{"title":"oops"}`), &fakeUnion{Kind: "a"}); err == nil {
+		t.Fatal("expected mismatch error when status differs from configured Status")
+	}
+}
+
+func TestPolymorphicView_unknownDiscriminator(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "table"
+
+	v := newPolyView()
+	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: "c"})
+	if err == nil {
+		t.Fatal("expected error for unknown discriminator")
+	}
+	if !strings.Contains(err.Error(), "fakeUnion") || !strings.Contains(err.Error(), `"c"`) {
+		t.Errorf("expected error to mention type and discriminator value, got %v", err)
+	}
+}
+
+func TestPolymorphicView_nilDetail(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "table"
+
+	v := newPolyView()
+	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), (*fakeUnion)(nil))
+	if err == nil {
+		t.Fatal("expected error for nil detail")
+	}
+}
+
+func TestPolymorphicView_resolveError(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "table"
+
+	wantErr := errors.New("resolve boom")
+	v := cmdutil.PolymorphicView[fakeUnion]{
+		Templates: polyTemplates(),
+		Variants: map[string]cmdutil.Variant[fakeUnion]{
+			"a": {Template: "a.tmpl", Resolve: func(u fakeUnion) (any, error) { return nil, wantErr }},
+		},
+	}
+	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: "a"})
+	if !errors.Is(err, wantErr) {
+		t.Errorf("expected resolve error to propagate, got %v", err)
+	}
+}
+
+func TestPolymorphicView_discriminatorError(t *testing.T) {
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "table"
+
+	v := newPolyView()
+	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: ""})
+	if err == nil {
+		t.Fatal("expected error for empty discriminator")
+	}
+	if !strings.Contains(err.Error(), "missing discriminator") {
+		t.Errorf("expected fakeUnion discriminator error to propagate, got %v", err)
+	}
+}
