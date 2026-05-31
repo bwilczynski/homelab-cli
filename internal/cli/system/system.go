@@ -18,6 +18,15 @@ import (
 var (
 	healthView      = cmdutil.View{Templates: systemTemplates, Name: "health.tmpl"}
 	updatesListView = cmdutil.View{Templates: systemTemplates, Name: "updates_list.tmpl"}
+	updateGetView   = cmdutil.PolymorphicView[gen.SystemUpdateDetail]{
+		Templates: systemTemplates,
+		Variants: map[string]cmdutil.Variant[gen.SystemUpdateDetail]{
+			"container": {
+				Template: "updates_get_container.tmpl",
+				Resolve:  func(d gen.SystemUpdateDetail) (any, error) { return d.AsContainerSystemUpdateDetail() },
+			},
+		},
+	}
 )
 
 func NewCmd() *cobra.Command {
@@ -204,31 +213,7 @@ func newGetUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			detail := resp.JSON200
-			disc, err := detail.Discriminator()
-			if err != nil {
-				return err
-			}
-
-			switch disc {
-			case "container":
-				d, err := detail.AsContainerSystemUpdateDetail()
-				if err != nil {
-					return err
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "updates_get_container.tmpl", d)
-			default:
-				return fmt.Errorf("unknown update type: %s", disc)
-			}
+			return updateGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
