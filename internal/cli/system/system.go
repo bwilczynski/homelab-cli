@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/bwilczynski/hlctl/internal/output"
 	gen "github.com/bwilczynski/hlctl/internal/system"
@@ -18,6 +16,7 @@ import (
 var (
 	healthView      = cmdutil.View{Templates: systemTemplates, Name: "health.tmpl"}
 	infoView        = cmdutil.View{Templates: systemTemplates, Name: "info.tmpl"}
+	utilizationView = cmdutil.View{Templates: systemTemplates, Name: "utilization.tmpl"}
 	updatesListView = cmdutil.View{Templates: systemTemplates, Name: "updates_list.tmpl"}
 	updateGetView   = cmdutil.PolymorphicView[gen.SystemUpdateDetail]{
 		Templates: systemTemplates,
@@ -137,30 +136,22 @@ func newUtilizationCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return apiclient.ParseError(resp.StatusCode(), resp.Body)
-		}
-
-		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(resp.Body))
-			return nil
-		}
-
-		list := resp.JSON200
-		var items []utilizationRow
-		for _, u := range list.Items {
-			swapPct := 0
-			if u.Memory.SwapTotalBytes > 0 {
-				swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
+		return utilizationView.RenderWith(w, resp.StatusCode(), resp.Body, func() (any, error) {
+			items := make([]utilizationRow, 0, len(resp.JSON200.Items))
+			for _, u := range resp.JSON200.Items {
+				swapPct := 0
+				if u.Memory.SwapTotalBytes > 0 {
+					swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
+				}
+				items = append(items, utilizationRow{
+					Device: u.Device,
+					Cpu:    fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
+					Memory: fmt.Sprintf("%d%%", u.Memory.UsedPercent),
+					Swap:   fmt.Sprintf("%d%%", swapPct),
+				})
 			}
-			items = append(items, utilizationRow{
-				Device: u.Device,
-				Cpu:    fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
-				Memory: fmt.Sprintf("%d%%", u.Memory.UsedPercent),
-				Swap:   fmt.Sprintf("%d%%", swapPct),
-			})
-		}
-		return output.RenderTemplate(w, systemTemplates, "utilization.tmpl", struct{ Items []utilizationRow }{items})
+			return struct{ Items []utilizationRow }{items}, nil
+		})
 	})
 	watch.RegisterFlags(cmd)
 	return cmd
