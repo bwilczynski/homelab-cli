@@ -20,6 +20,20 @@ var (
 	clientsListView = cmdutil.View{Templates: networkTemplates, Name: "clients_list.tmpl"}
 )
 
+var clientGetView = cmdutil.PolymorphicView[gen.NetworkClientDetail]{
+	Templates: networkTemplates,
+	Variants: map[string]cmdutil.Variant[gen.NetworkClientDetail]{
+		"wired": {
+			Template: "clients_get_wired.tmpl",
+			Resolve:  func(d gen.NetworkClientDetail) (any, error) { return d.AsWiredNetworkClientDetail() },
+		},
+		"wireless": {
+			Template: "clients_get_wireless.tmpl",
+			Resolve:  func(d gen.NetworkClientDetail) (any, error) { return d.AsWirelessNetworkClientDetail() },
+		},
+	},
+}
+
 // switchDetailView wraps gen.SwitchDetail with pre-resolved port data.
 // The Ports field shadows gen.SwitchDetail.Ports so the template always
 // sees []switchPortView, with ConnectedToName already resolved.
@@ -223,40 +237,7 @@ func newGetClientCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			detail := *resp.JSON200
-
-			disc, err := detail.Discriminator()
-			if err != nil {
-				return err
-			}
-
-			switch disc {
-			case "wired":
-				d, err := detail.AsWiredNetworkClientDetail()
-				if err != nil {
-					return err
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "clients_get_wired.tmpl", d)
-
-			case "wireless":
-				d, err := detail.AsWirelessNetworkClientDetail()
-				if err != nil {
-					return err
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "clients_get_wireless.tmpl", d)
-
-			default:
-				return fmt.Errorf("unknown connection type: %s", disc)
-			}
+			return clientGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
