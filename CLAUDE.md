@@ -55,7 +55,8 @@ make build
 6. Start/stop/restart-style commands (204 No Content + success message) use `cmdutil.ActionCmd[<Domain>Client](use, short, pastTense, exec)`.
 7. Register the new domain in `internal/cli/root.go` via `rootCmd.AddCommand(<domain>.NewCmd())`.
 8. Tests construct leaves directly and seed the client via `cmdutil.SetClient[<Domain>Client](cmd, stub)`.
-9. For polymorphic responses (discriminated unions like `NetworkDeviceDetail`, `SystemUpdateDetail`), keep the status check + JSON branch inline (still using `flags.GetOutputFormat`) and call `output.RenderTemplate` directly with the resolved variant's template. `cmdutil.View.Render` cannot dispatch on a discriminator.
+9. For polymorphic responses (discriminated unions like `NetworkDeviceDetail`, `SystemUpdateDetail`), declare a `cmdutil.PolymorphicView[<UnionType>]` instead of a `View`. Its `Variants` map is keyed by the discriminator string returned by `T.Discriminator()`; each `Variant` binds a template name to a `Resolve func(T) (any, error)` that calls the appropriate `As<Variant>()` accessor (and optionally transforms the result). Render with `view.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)` — same call shape as `View.Render`. When a variant resolver depends on per-call state (e.g. a flag), construct the `PolymorphicView` inside `RunE` so the resolver can close over it.
+10. When template data must be derived from the response body (e.g. row structs with formatted bytes/uptime), use `view.RenderWith(w, resp.StatusCode(), resp.Body, fn)` instead of `view.Render`. `fn` is invoked only in table mode, so derivation work is skipped when `--output=json`.
 
 ## Adding a New oapi-codegen Domain
 
