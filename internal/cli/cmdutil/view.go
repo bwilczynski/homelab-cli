@@ -24,21 +24,48 @@ type View struct {
 	Status    int
 }
 
+// renderHead handles the status check and JSON shortcut shared by every
+// render path. Returns handled=true when the JSON body has been written and
+// the caller should return nil; returns a non-nil error on status mismatch.
+func renderHead(w io.Writer, expectedStatus, statusCode int, body []byte) (handled bool, err error) {
+	expected := expectedStatus
+	if expected == 0 {
+		expected = http.StatusOK
+	}
+	if statusCode != expected {
+		return false, apiclient.ParseError(statusCode, body)
+	}
+	if flags.GetOutputFormat() == output.FormatJSON {
+		fmt.Fprint(w, string(body))
+		return true, nil
+	}
+	return false, nil
+}
+
 // Render handles the standard response→output flow:
 //   - status != v.Status (or 200 if unset) → apiclient.ParseError
 //   - --output=json → write raw body
 //   - otherwise → render the bound template against data
 func (v View) Render(w io.Writer, statusCode int, body []byte, data any) error {
-	expected := v.Status
-	if expected == 0 {
-		expected = http.StatusOK
+	handled, err := renderHead(w, v.Status, statusCode, body)
+	if handled || err != nil {
+		return err
 	}
-	if statusCode != expected {
-		return apiclient.ParseError(statusCode, body)
+	return output.RenderTemplate(w, v.Templates, v.Name, data)
+}
+
+// RenderWith mirrors Render but defers data construction. fn is invoked only
+// in table mode — JSON mode dumps the raw body without running fn. Use this
+// when the template data needs to be derived from the response body and the
+// derivation work would be wasted in JSON mode.
+func (v View) RenderWith(w io.Writer, statusCode int, body []byte, fn func() (any, error)) error {
+	handled, err := renderHead(w, v.Status, statusCode, body)
+	if handled || err != nil {
+		return err
 	}
-	if flags.GetOutputFormat() == output.FormatJSON {
-		fmt.Fprint(w, string(body))
-		return nil
+	data, err := fn()
+	if err != nil {
+		return err
 	}
 	return output.RenderTemplate(w, v.Templates, v.Name, data)
 }
