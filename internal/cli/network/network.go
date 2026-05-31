@@ -38,6 +38,9 @@ func NewCmd() *cobra.Command {
 		Use:   "network",
 		Short: "Network devices and clients",
 	}
+	// Needed for `topology`, which is a direct child of root with no sub-group
+	// parent. Cobra runs the closest PersistentPreRunE up the chain, so the
+	// sub-group InjectClient calls below shadow this for their own leaves.
 	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newDevicesCmd())
 	cmd.AddCommand(newClientsCmd())
