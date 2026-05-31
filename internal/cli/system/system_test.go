@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	gen "github.com/bwilczynski/hlctl/internal/system"
 )
 
@@ -325,5 +326,49 @@ func TestCheckUpdatesCmd_tableOutput(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in output, got:\n%s", want, out)
 		}
+	}
+}
+
+func TestGetUpdateCmd_jsonOutput(t *testing.T) {
+	stub := &StubClient{
+		GetSystemUpdateWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetSystemUpdateResponse, error) {
+			return okGetUpdateResp(map[string]any{
+				"id":             "nas-1.homeassistant",
+				"name":           "homeassistant",
+				"device":         "nas-1",
+				"type":           "container",
+				"status":         "updateAvailable",
+				"currentVersion": "2024.1.0",
+				"latestVersion":  "2024.2.0",
+				"checkedAt":      time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+				"publishedAt":    time.Date(2026, 4, 28, 10, 0, 0, 0, time.UTC),
+				"image":          "ghcr.io/home-assistant/home-assistant",
+				"source":         "https://github.com/home-assistant/core",
+				"releaseUrl":     "https://github.com/home-assistant/core/releases/tag/2024.2.0",
+			}), nil
+		},
+	}
+
+	t.Cleanup(func() { flags.OutputFormat = "" })
+	flags.OutputFormat = "json"
+
+	cmd := newGetUpdateCmd()
+	cmdutil.SetClient[SystemClient](cmd, stub)
+	cmd.SetArgs([]string{"nas-1.homeassistant"})
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	// Should contain raw JSON fields
+	if !strings.Contains(out, "ghcr.io/home-assistant/home-assistant") {
+		t.Errorf("expected raw JSON with image field in output, got:\n%s", out)
+	}
+	// Should NOT contain table header-like output from template rendering
+	if strings.Contains(out, "Type") && strings.Contains(out, "Version") {
+		t.Errorf("unexpected template rendering detected in JSON output:\n%s", out)
 	}
 }

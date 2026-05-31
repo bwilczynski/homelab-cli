@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
@@ -24,6 +25,8 @@ func NewCmd() *cobra.Command {
 		Use:   "system",
 		Short: "System health and information",
 	}
+	// Single injection on `system` covers the `updates` sub-parent via Cobra's
+	// PersistentPreRunE inheritance — sub-parents must NOT define their own.
 	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newHealthCmd(), newInfoCmd(), newUtilizationCmd(), newUpdatesCmd())
 	return cmd
@@ -91,7 +94,7 @@ func newInfoCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != 200 {
+		if resp.StatusCode() != http.StatusOK {
 			return apiclient.ParseError(resp.StatusCode(), resp.Body)
 		}
 
@@ -132,7 +135,7 @@ func newUtilizationCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != 200 {
+		if resp.StatusCode() != http.StatusOK {
 			return apiclient.ParseError(resp.StatusCode(), resp.Body)
 		}
 
@@ -201,8 +204,13 @@ func newGetUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode() != 200 {
+			if resp.StatusCode() != http.StatusOK {
 				return apiclient.ParseError(resp.StatusCode(), resp.Body)
+			}
+
+			if flags.GetOutputFormat() == output.FormatJSON {
+				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
+				return nil
 			}
 
 			detail := resp.JSON200
