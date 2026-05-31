@@ -7,11 +7,17 @@ import (
 	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	gen "github.com/bwilczynski/hlctl/internal/network"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
+)
+
+var (
+	devicesListView = cmdutil.View{Templates: networkTemplates, Name: "devices_list.tmpl"}
+	clientsListView = cmdutil.View{Templates: networkTemplates, Name: "clients_list.tmpl"}
 )
 
 // switchDetailView wraps gen.SwitchDetail with pre-resolved port data.
@@ -32,9 +38,10 @@ func NewCmd() *cobra.Command {
 		Use:   "network",
 		Short: "Network devices and clients",
 	}
+	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newDevicesCmd())
 	cmd.AddCommand(newClientsCmd())
-	cmd.AddCommand(newTopologyCmd(nil))
+	cmd.AddCommand(newTopologyCmd())
 	cmd.AddCommand(newVlansCmd())
 	cmd.AddCommand(newSsidsCmd())
 	cmd.AddCommand(newWansCmd())
@@ -54,60 +61,34 @@ func newDevicesCmd() *cobra.Command {
 		Use:   "devices",
 		Short: "Network devices",
 	}
-	cmd.AddCommand(newListDevicesCmd(nil))
-	cmd.AddCommand(newGetDeviceCmd(nil))
+	cmdutil.InjectClient(cmd, buildClient)
+	cmd.AddCommand(newListDevicesCmd())
+	cmd.AddCommand(newGetDeviceCmd())
 	return cmd
 }
 
-func newListDevicesCmd(client NetworkClient) *cobra.Command {
+func newListDevicesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List network devices",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			resp, err := c.ListNetworkDevicesWithResponse(context.Background())
+			resp, err := cmdutil.Client[NetworkClient](cmd).ListNetworkDevicesWithResponse(cmd.Context())
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "devices_list.tmpl", *resp.JSON200)
+			return devicesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
 
-func newGetDeviceCmd(client NetworkClient) *cobra.Command {
+func newGetDeviceCmd() *cobra.Command {
 	var allPorts bool
 	cmd := &cobra.Command{
 		Use:   "get <device-id>",
 		Short: "Show network device details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			resp, err := c.GetNetworkDeviceWithResponse(context.Background(), args[0])
+			resp, err := cmdutil.Client[NetworkClient](cmd).GetNetworkDeviceWithResponse(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
@@ -199,69 +180,43 @@ func newClientsCmd() *cobra.Command {
 		Use:   "clients",
 		Short: "Network clients",
 	}
-	cmd.AddCommand(newListClientsCmd(nil))
-	cmd.AddCommand(newGetClientCmd(nil))
+	cmdutil.InjectClient(cmd, buildClient)
+	cmd.AddCommand(newListClientsCmd())
+	cmd.AddCommand(newGetClientCmd())
 	return cmd
 }
 
-func newListClientsCmd(client NetworkClient) *cobra.Command {
+func newListClientsCmd() *cobra.Command {
 	var statusFilter string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List network clients",
 	}
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		c := client
-		if c == nil {
-			var err error
-			c, err = buildClient()
-			if err != nil {
-				return err
-			}
-		}
-
 		params := &gen.ListNetworkClientsParams{}
 		if statusFilter != "" {
 			s := gen.NetworkClientStatus(statusFilter)
 			params.Status = &s
 		}
 
-		resp, err := c.ListNetworkClientsWithResponse(ctx, params)
+		resp, err := cmdutil.Client[NetworkClient](cmd).ListNetworkClientsWithResponse(ctx, params)
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return apiclient.ParseError(resp.StatusCode(), resp.Body)
-		}
-
-		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(resp.Body))
-			return nil
-		}
-
-		return output.RenderTemplate(w, networkTemplates, "clients_list.tmpl", *resp.JSON200)
+		return clientsListView.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)
 	})
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
 	watch.RegisterFlags(cmd)
 	return cmd
 }
 
-func newGetClientCmd(client NetworkClient) *cobra.Command {
+func newGetClientCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <client-id>",
 		Short: "Show network client details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := client
-			if c == nil {
-				var err error
-				c, err = buildClient()
-				if err != nil {
-					return err
-				}
-			}
-
-			resp, err := c.GetNetworkClientWithResponse(context.Background(), args[0])
+			resp, err := cmdutil.Client[NetworkClient](cmd).GetNetworkClientWithResponse(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
@@ -315,7 +270,7 @@ type topologyEdge struct {
 	EdgeDisp string
 }
 
-func newTopologyCmd(client NetworkClient) *cobra.Command {
+func newTopologyCmd() *cobra.Command {
 	var includeClients bool
 	var includeWireless bool
 
@@ -324,22 +279,13 @@ func newTopologyCmd(client NetworkClient) *cobra.Command {
 		Short: "Show network topology",
 	}
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		c := client
-		if c == nil {
-			var err error
-			c, err = buildClient()
-			if err != nil {
-				return err
-			}
-		}
-
 		params := &gen.GetNetworkTopologyParams{}
 		if includeClients || includeWireless {
 			t := true
 			params.IncludeClients = &t
 		}
 
-		resp, err := c.GetNetworkTopologyWithResponse(ctx, params)
+		resp, err := cmdutil.Client[NetworkClient](cmd).GetNetworkTopologyWithResponse(ctx, params)
 		if err != nil {
 			return err
 		}
