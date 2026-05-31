@@ -47,6 +47,42 @@ type switchPortView struct {
 	ConnectedToName string
 }
 
+// buildSwitchPortViews filters and decorates a switch's ports for display.
+// When allPorts is false, only ports with state "up" are returned. Each
+// remaining port's ConnectedTo field is resolved to a display name (device or
+// client name, or "-" when nothing is connected).
+func buildSwitchPortViews(ports []gen.SwitchPort, allPorts bool) ([]switchPortView, error) {
+	var out []switchPortView
+	for _, p := range ports {
+		if !allPorts && p.State != gen.NetworkPortStateUp {
+			continue
+		}
+		connectedTo := "-"
+		if p.ConnectedTo != nil {
+			kind, err := p.ConnectedTo.Discriminator()
+			if err != nil {
+				return nil, err
+			}
+			switch kind {
+			case "device":
+				ref, err := p.ConnectedTo.AsNetworkDeviceRef()
+				if err != nil {
+					return nil, err
+				}
+				connectedTo = ref.Name
+			case "client":
+				ref, err := p.ConnectedTo.AsNetworkClientRef()
+				if err != nil {
+					return nil, err
+				}
+				connectedTo = ref.Name
+			}
+		}
+		out = append(out, switchPortView{SwitchPort: p, ConnectedToName: connectedTo})
+	}
+	return out, nil
+}
+
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "network",
@@ -105,87 +141,43 @@ func newGetDeviceCmd() *cobra.Command {
 		Short: "Show network device details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			view := cmdutil.PolymorphicView[gen.NetworkDeviceDetail]{
+				Templates: networkTemplates,
+				Variants: map[string]cmdutil.Variant[gen.NetworkDeviceDetail]{
+					"switch": {
+						Template: "devices_get_switch.tmpl",
+						Resolve: func(d gen.NetworkDeviceDetail) (any, error) {
+							sw, err := d.AsSwitchDetail()
+							if err != nil {
+								return nil, err
+							}
+							portViews, err := buildSwitchPortViews(sw.Ports, allPorts)
+							if err != nil {
+								return nil, err
+							}
+							return switchDetailView{SwitchDetail: sw, Ports: portViews}, nil
+						},
+					},
+					"accessPoint": {
+						Template: "devices_get_accesspoint.tmpl",
+						Resolve:  func(d gen.NetworkDeviceDetail) (any, error) { return d.AsAccessPointDetail() },
+					},
+					"gateway": {
+						Template: "devices_get_gateway.tmpl",
+						Resolve:  func(d gen.NetworkDeviceDetail) (any, error) { return d.AsGatewayDetail() },
+					},
+					"unknown": {
+						Template: "devices_get_unknown.tmpl",
+						Resolve:  func(d gen.NetworkDeviceDetail) (any, error) { return d.AsUnknownDeviceDetail() },
+					},
+				},
+			}
+
 			resp, err := cmdutil.Client[NetworkClient](cmd).GetNetworkDeviceWithResponse(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			detail := *resp.JSON200
-
-			disc, err := detail.Discriminator()
-			if err != nil {
-				return err
-			}
-
-			switch disc {
-			case "switch":
-				d, err := detail.AsSwitchDetail()
-				if err != nil {
-					return err
-				}
-				var portViews []switchPortView
-				for _, p := range d.Ports {
-					if !allPorts && p.State != gen.NetworkPortStateUp {
-						continue
-					}
-					connectedTo := "-"
-					if p.ConnectedTo != nil {
-						kind, err := p.ConnectedTo.Discriminator()
-						if err != nil {
-							return err
-						}
-						switch kind {
-						case "device":
-							ref, err := p.ConnectedTo.AsNetworkDeviceRef()
-							if err != nil {
-								return err
-							}
-							connectedTo = ref.Name
-						case "client":
-							ref, err := p.ConnectedTo.AsNetworkClientRef()
-							if err != nil {
-								return err
-							}
-							connectedTo = ref.Name
-						}
-					}
-					portViews = append(portViews, switchPortView{SwitchPort: p, ConnectedToName: connectedTo})
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "devices_get_switch.tmpl",
-					switchDetailView{SwitchDetail: d, Ports: portViews})
-
-			case "accessPoint":
-				d, err := detail.AsAccessPointDetail()
-				if err != nil {
-					return err
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "devices_get_accesspoint.tmpl", d)
-
-			case "gateway":
-				d, err := detail.AsGatewayDetail()
-				if err != nil {
-					return err
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "devices_get_gateway.tmpl", d)
-
-			case "unknown":
-				d, err := detail.AsUnknownDeviceDetail()
-				if err != nil {
-					return err
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), networkTemplates, "devices_get_unknown.tmpl", d)
-
-			default:
-				return fmt.Errorf("unknown device type: %s", disc)
-			}
+			return view.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 	cmd.Flags().BoolVar(&allPorts, "all-ports", false, "Show all ports (default: active ports only)")
