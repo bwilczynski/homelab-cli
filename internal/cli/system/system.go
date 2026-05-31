@@ -17,6 +17,7 @@ import (
 
 var (
 	healthView      = cmdutil.View{Templates: systemTemplates, Name: "health.tmpl"}
+	infoView        = cmdutil.View{Templates: systemTemplates, Name: "info.tmpl"}
 	updatesListView = cmdutil.View{Templates: systemTemplates, Name: "updates_list.tmpl"}
 	updateGetView   = cmdutil.PolymorphicView[gen.SystemUpdateDetail]{
 		Templates: systemTemplates,
@@ -103,27 +104,19 @@ func newInfoCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return apiclient.ParseError(resp.StatusCode(), resp.Body)
-		}
-
-		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-			return nil
-		}
-
-		list := resp.JSON200
-		var items []infoRow
-		for _, info := range list.Items {
-			items = append(items, infoRow{
-				Device:   info.Device,
-				Model:    info.Model,
-				Firmware: info.Firmware,
-				Ram:      output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
-				Uptime:   output.FormatUptime(int(info.UptimeSeconds)),
-			})
-		}
-		return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "info.tmpl", struct{ Items []infoRow }{items})
+		return infoView.RenderWith(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, func() (any, error) {
+			items := make([]infoRow, 0, len(resp.JSON200.Items))
+			for _, info := range resp.JSON200.Items {
+				items = append(items, infoRow{
+					Device:   info.Device,
+					Model:    info.Model,
+					Firmware: info.Firmware,
+					Ram:      output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
+					Uptime:   output.FormatUptime(int(info.UptimeSeconds)),
+				})
+			}
+			return struct{ Items []infoRow }{items}, nil
+		})
 	}
 	return cmd
 }
