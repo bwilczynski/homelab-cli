@@ -62,7 +62,6 @@ func newDevicesCmd() *cobra.Command {
 		Use:   "devices",
 		Short: "Network devices",
 	}
-	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newListDevicesCmd())
 	cmd.AddCommand(newGetDeviceCmd())
 	return cmd

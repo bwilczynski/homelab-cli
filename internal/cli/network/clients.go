@@ -33,7 +33,6 @@ func newClientsCmd() *cobra.Command {
 		Use:   "clients",
 		Short: "Network clients",
 	}
-	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newListClientsCmd())
 	cmd.AddCommand(newGetClientCmd())
 	return cmd

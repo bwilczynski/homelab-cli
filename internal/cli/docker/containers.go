@@ -18,11 +18,11 @@ var (
 func newContainersCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "containers", Short: "Manage Docker containers"}
 	cmdutil.InjectClient(cmd, buildClient)
-	cmd.AddCommand(newListCmd(), newGetCmd(), newStartCmd(), newStopCmd(), newRestartCmd())
+	cmd.AddCommand(newListContainersCmd(), newGetContainerCmd(), newStartContainerCmd(), newStopContainerCmd(), newRestartContainerCmd())
 	return cmd
 }
 
-func newListCmd() *cobra.Command {
+func newListContainersCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "list", Short: "List containers"}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
@@ -40,7 +40,7 @@ func newListCmd() *cobra.Command {
 	return cmd
 }
 
-func newGetCmd() *cobra.Command {
+func newGetContainerCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "get <container-id>", Short: "Show container details", Args: cobra.ExactArgs(1)}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		resp, err := cmdutil.Client[DockerClient](cmd).GetContainerWithResponse(cmd.Context(), args[0])
@@ -52,7 +52,7 @@ func newGetCmd() *cobra.Command {
 	return cmd
 }
 
-func newStartCmd() *cobra.Command {
+func newStartContainerCmd() *cobra.Command {
 	return cmdutil.ActionCmd("start <container-id>", "Start a container", "started",
 		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
 			r, err := c.StartContainerWithResponse(ctx, id, &gen.StartContainerParams{})
@@ -63,7 +63,7 @@ func newStartCmd() *cobra.Command {
 		})
 }
 
-func newStopCmd() *cobra.Command {
+func newStopContainerCmd() *cobra.Command {
 	return cmdutil.ActionCmd("stop <container-id>", "Stop a container", "stopped",
 		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
 			r, err := c.StopContainerWithResponse(ctx, id, &gen.StopContainerParams{})
@@ -74,7 +74,7 @@ func newStopCmd() *cobra.Command {
 		})
 }
 
-func newRestartCmd() *cobra.Command {
+func newRestartContainerCmd() *cobra.Command {
 	return cmdutil.ActionCmd("restart <container-id>", "Restart a container", "restarted",
 		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
 			r, err := c.RestartContainerWithResponse(ctx, id, &gen.RestartContainerParams{})

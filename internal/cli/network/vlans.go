@@ -15,7 +15,6 @@ func newVlansCmd() *cobra.Command {
 		Use:   "vlans",
 		Short: "VLANs",
 	}
-	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newListVlansCmd(), newGetVlanCmd())
 	return cmd
 }

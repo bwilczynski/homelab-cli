@@ -15,7 +15,6 @@ func newSsidsCmd() *cobra.Command {
 		Use:   "ssids",
 		Short: "WiFi networks (SSIDs)",
 	}
-	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newListSsidsCmd(), newGetSsidCmd())
 	return cmd
 }
