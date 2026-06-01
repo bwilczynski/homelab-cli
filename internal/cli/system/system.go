@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 
 	"github.com/bwilczynski/hlctl/internal/apiclient"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/bwilczynski/hlctl/internal/output"
 	gen "github.com/bwilczynski/hlctl/internal/system"
@@ -17,7 +15,18 @@ import (
 
 var (
 	healthView      = cmdutil.View{Templates: systemTemplates, Name: "health.tmpl"}
+	infoView        = cmdutil.View{Templates: systemTemplates, Name: "info.tmpl"}
+	utilizationView = cmdutil.View{Templates: systemTemplates, Name: "utilization.tmpl"}
 	updatesListView = cmdutil.View{Templates: systemTemplates, Name: "updates_list.tmpl"}
+	updateGetView   = cmdutil.PolymorphicView[gen.SystemUpdateDetail]{
+		Templates: systemTemplates,
+		Variants: map[string]cmdutil.Variant[gen.SystemUpdateDetail]{
+			"container": {
+				Template: "updates_get_container.tmpl",
+				Resolve:  func(d gen.SystemUpdateDetail) (any, error) { return d.AsContainerSystemUpdateDetail() },
+			},
+		},
+	}
 )
 
 func NewCmd() *cobra.Command {
@@ -94,27 +103,19 @@ func newInfoCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return apiclient.ParseError(resp.StatusCode(), resp.Body)
-		}
-
-		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-			return nil
-		}
-
-		list := resp.JSON200
-		var items []infoRow
-		for _, info := range list.Items {
-			items = append(items, infoRow{
-				Device:   info.Device,
-				Model:    info.Model,
-				Firmware: info.Firmware,
-				Ram:      output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
-				Uptime:   output.FormatUptime(int(info.UptimeSeconds)),
-			})
-		}
-		return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "info.tmpl", struct{ Items []infoRow }{items})
+		return infoView.RenderWith(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, func() (any, error) {
+			items := make([]infoRow, 0, len(resp.JSON200.Items))
+			for _, info := range resp.JSON200.Items {
+				items = append(items, infoRow{
+					Device:   info.Device,
+					Model:    info.Model,
+					Firmware: info.Firmware,
+					Ram:      output.FormatBytes(int64(info.RamMb) * 1024 * 1024),
+					Uptime:   output.FormatUptime(int(info.UptimeSeconds)),
+				})
+			}
+			return struct{ Items []infoRow }{items}, nil
+		})
 	}
 	return cmd
 }
@@ -135,30 +136,22 @@ func newUtilizationCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode() != http.StatusOK {
-			return apiclient.ParseError(resp.StatusCode(), resp.Body)
-		}
-
-		if flags.GetOutputFormat() == output.FormatJSON {
-			fmt.Fprint(w, string(resp.Body))
-			return nil
-		}
-
-		list := resp.JSON200
-		var items []utilizationRow
-		for _, u := range list.Items {
-			swapPct := 0
-			if u.Memory.SwapTotalBytes > 0 {
-				swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
+		return utilizationView.RenderWith(w, resp.StatusCode(), resp.Body, func() (any, error) {
+			items := make([]utilizationRow, 0, len(resp.JSON200.Items))
+			for _, u := range resp.JSON200.Items {
+				swapPct := 0
+				if u.Memory.SwapTotalBytes > 0 {
+					swapPct = int(u.Memory.SwapUsedBytes * 100 / u.Memory.SwapTotalBytes)
+				}
+				items = append(items, utilizationRow{
+					Device: u.Device,
+					Cpu:    fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
+					Memory: fmt.Sprintf("%d%%", u.Memory.UsedPercent),
+					Swap:   fmt.Sprintf("%d%%", swapPct),
+				})
 			}
-			items = append(items, utilizationRow{
-				Device: u.Device,
-				Cpu:    fmt.Sprintf("%d%%", u.Cpu.TotalPercent),
-				Memory: fmt.Sprintf("%d%%", u.Memory.UsedPercent),
-				Swap:   fmt.Sprintf("%d%%", swapPct),
-			})
-		}
-		return output.RenderTemplate(w, systemTemplates, "utilization.tmpl", struct{ Items []utilizationRow }{items})
+			return struct{ Items []utilizationRow }{items}, nil
+		})
 	})
 	watch.RegisterFlags(cmd)
 	return cmd
@@ -204,31 +197,7 @@ func newGetUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if resp.StatusCode() != http.StatusOK {
-				return apiclient.ParseError(resp.StatusCode(), resp.Body)
-			}
-
-			if flags.GetOutputFormat() == output.FormatJSON {
-				fmt.Fprint(cmd.OutOrStdout(), string(resp.Body))
-				return nil
-			}
-
-			detail := resp.JSON200
-			disc, err := detail.Discriminator()
-			if err != nil {
-				return err
-			}
-
-			switch disc {
-			case "container":
-				d, err := detail.AsContainerSystemUpdateDetail()
-				if err != nil {
-					return err
-				}
-				return output.RenderTemplate(cmd.OutOrStdout(), systemTemplates, "updates_get_container.tmpl", d)
-			default:
-				return fmt.Errorf("unknown update type: %s", disc)
-			}
+			return updateGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
