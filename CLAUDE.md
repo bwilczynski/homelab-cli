@@ -49,7 +49,7 @@ make build
    var fooListView = cmdutil.View{Templates: <domain>Templates, Name: "foo_list.tmpl"}
    ```
    Set `Status:` explicitly on the View only when the endpoint returns something other than 200.
-3. Each parent command calls `cmdutil.InjectClient(cmd, buildClient)` after construction; leaf commands have no `client` parameter and call `cmdutil.Client[<Domain>Client](cmd).<Method>(...)` to retrieve it.
+3. Exactly one ancestor per leaf path calls `cmdutil.InjectClient(cmd, buildClient)` — Cobra runs the closest `PersistentPreRunE` only, so additional calls on intermediate parents are dead. Put it on the domain root when all leaves share one client (`network`, `system`); put it on each sub-group parent when only some sub-trees need it (`docker`, `storage`). Leaf commands have no `client` parameter and call `cmdutil.Client[<Domain>Client](cmd).<Method>(...)` to retrieve it.
 4. Leaf commands render with `<view>.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)` — use `cmd.OutOrStdout()` for the writer outside `watch.Wrap`, and the `w` argument passed by `watch.Wrap` inside it.
 5. List commands accepting a device filter use `device := cmdutil.DeviceFlag(cmd)`; dereference with `*device`.
 6. Start/stop/restart-style commands (204 No Content + success message) use `cmdutil.ActionCmd[<Domain>Client](use, short, pastTense, exec)`.

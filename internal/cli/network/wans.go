@@ -15,7 +15,6 @@ func newWansCmd() *cobra.Command {
 		Use:   "wans",
 		Short: "WAN interfaces",
 	}
-	cmdutil.InjectClient(cmd, buildClient)
 	cmd.AddCommand(newListWansCmd(), newGetWanCmd())
 	return cmd
 }
