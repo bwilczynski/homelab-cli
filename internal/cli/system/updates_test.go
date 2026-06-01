@@ -1,4 +1,3 @@
-// internal/cli/system/system_test.go
 package system
 
 import (
@@ -14,26 +13,6 @@ import (
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	gen "github.com/bwilczynski/hlctl/internal/system"
 )
-
-func okHealthResp(data gen.Health) *gen.GetSystemHealthResponse {
-	b, _ := json.Marshal(data)
-	return &gen.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
-}
-
-func errHealthResp(status int, body map[string]any) *gen.GetSystemHealthResponse {
-	b, _ := json.Marshal(body)
-	return &gen.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
-}
-
-func okInfoResp(list gen.SystemInfoList) *gen.ListSystemInfoResponse {
-	b, _ := json.Marshal(list)
-	return &gen.ListSystemInfoResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
-
-func okUtilizationResp(list gen.SystemUtilizationList) *gen.ListSystemUtilizationResponse {
-	b, _ := json.Marshal(list)
-	return &gen.ListSystemUtilizationResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
 
 func okListUpdatesResp(list gen.SystemUpdateList) *gen.ListSystemUpdatesResponse {
 	b, _ := json.Marshal(list)
@@ -55,135 +34,6 @@ func errGetUpdateResp(status int, body map[string]any) *gen.GetSystemUpdateRespo
 func okCheckUpdatesResp(list gen.SystemUpdateList) *gen.CheckSystemUpdatesResponse {
 	b, _ := json.Marshal(list)
 	return &gen.CheckSystemUpdatesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
-
-func TestHealthCmd_tableOutput(t *testing.T) {
-	msg := "disk failing"
-	stub := &StubClient{
-		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.GetSystemHealthResponse, error) {
-			return okHealthResp(gen.Health{
-				Status:    gen.Healthy,
-				CheckedAt: time.Now(),
-				Components: []gen.ComponentHealth{
-					{Name: "nas-1", Status: gen.Healthy},
-					{Name: "unifi", Status: gen.Degraded, Message: &msg},
-				},
-			}), nil
-		},
-	}
-
-	cmd := newHealthCmd()
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	out := buf.String()
-	for _, want := range []string{"nas-1", "healthy", "unifi", "degraded"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
-		}
-	}
-}
-
-func TestHealthCmd_apiError(t *testing.T) {
-	stub := &StubClient{
-		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.GetSystemHealthResponse, error) {
-			return errHealthResp(http.StatusUnauthorized, map[string]any{
-				"type":   "https://homelab.local/problems/unauthorized",
-				"title":  "Unauthorized",
-				"status": 401,
-				"detail": "Bearer token missing",
-			}), nil
-		},
-	}
-
-	cmd := newHealthCmd()
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "Unauthorized") {
-		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
-	}
-}
-
-func TestInfoCmd_tableOutput(t *testing.T) {
-	stub := &StubClient{
-		ListSystemInfoWithResponseFunc: func(_ context.Context, _ *gen.ListSystemInfoParams, _ ...gen.RequestEditorFn) (*gen.ListSystemInfoResponse, error) {
-			return okInfoResp(gen.SystemInfoList{
-				Items: []gen.SystemInfo{
-					{
-						Device:        "nas-1",
-						Model:         "DS920+",
-						Firmware:      "7.2.1-69057",
-						RamMb:         4096,
-						UptimeSeconds: 3_931_200,
-					},
-				},
-			}), nil
-		},
-	}
-
-	cmd := newInfoCmd()
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	out := buf.String()
-	for _, want := range []string{"nas-1", "DS920+", "7.2.1-69057", "4.0 GB"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
-		}
-	}
-}
-
-func TestUtilizationCmd_tableOutput(t *testing.T) {
-	stub := &StubClient{
-		ListSystemUtilizationWithResponseFunc: func(_ context.Context, _ *gen.ListSystemUtilizationParams, _ ...gen.RequestEditorFn) (*gen.ListSystemUtilizationResponse, error) {
-			return okUtilizationResp(gen.SystemUtilizationList{
-				Items: []gen.SystemUtilization{
-					{
-						Device:    "nas-1",
-						SampledAt: time.Now(),
-						Cpu:       gen.CpuUsage{TotalPercent: 12},
-						Memory: gen.MemoryUsage{
-							UsedPercent:    68,
-							SwapTotalBytes: 2_147_483_648,
-							SwapUsedBytes:  0,
-						},
-					},
-				},
-			}), nil
-		},
-	}
-
-	cmd := newUtilizationCmd()
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	out := buf.String()
-	for _, want := range []string{"nas-1", "12%", "68%"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
-		}
-	}
 }
 
 func TestListUpdatesCmd_tableOutput(t *testing.T) {
@@ -363,11 +213,9 @@ func TestGetUpdateCmd_jsonOutput(t *testing.T) {
 	}
 
 	out := buf.String()
-	// Should contain raw JSON fields
 	if !strings.Contains(out, "ghcr.io/home-assistant/home-assistant") {
 		t.Errorf("expected raw JSON with image field in output, got:\n%s", out)
 	}
-	// Should NOT contain table header-like output from template rendering
 	if strings.Contains(out, "Type") && strings.Contains(out, "Version") {
 		t.Errorf("unexpected template rendering detected in JSON output:\n%s", out)
 	}
