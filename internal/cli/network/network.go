@@ -1,7 +1,7 @@
 package network
 
 import (
-	"github.com/bwilczynski/hlctl/internal/apiclient"
+	"github.com/bwilczynski/hlctl/internal/api"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +22,7 @@ func NewCmd() *cobra.Command {
 }
 
 func buildClient() (NetworkClient, error) {
-	httpClient, apiURL, err := apiclient.NewHTTPClient()
+	httpClient, apiURL, err := api.NewHTTPClient()
 	if err != nil {
 		return nil, err
 	}

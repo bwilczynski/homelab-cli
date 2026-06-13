@@ -1,7 +1,7 @@
 package docker
 
 import (
-	"github.com/bwilczynski/hlctl/internal/apiclient"
+	"github.com/bwilczynski/hlctl/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +12,7 @@ func NewCmd() *cobra.Command {
 }
 
 func buildClient() (DockerClient, error) {
-	httpClient, apiURL, err := apiclient.NewHTTPClient()
+	httpClient, apiURL, err := api.NewHTTPClient()
 	if err != nil {
 		return nil, err
 	}

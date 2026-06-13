@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/bwilczynski/hlctl/internal/apiclient"
+	"github.com/bwilczynski/hlctl/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +23,7 @@ func ActionCmd[C any](use, short, pastTense string, exec func(c C, ctx context.C
 				return err
 			}
 			if code != http.StatusNoContent {
-				return apiclient.ParseError(code, body)
+				return api.ParseError(code, body)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", args[0], pastTense)
 			return nil

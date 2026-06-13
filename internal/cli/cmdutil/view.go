@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/bwilczynski/hlctl/internal/apiclient"
+	"github.com/bwilczynski/hlctl/internal/api"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/output"
 )
@@ -33,7 +33,7 @@ func renderHead(w io.Writer, expectedStatus, statusCode int, body []byte) (handl
 		expected = http.StatusOK
 	}
 	if statusCode != expected {
-		return false, apiclient.ParseError(statusCode, body)
+		return false, api.ParseError(statusCode, body)
 	}
 	if flags.GetOutputFormat() == output.FormatJSON {
 		fmt.Fprint(w, string(body))
@@ -43,7 +43,7 @@ func renderHead(w io.Writer, expectedStatus, statusCode int, body []byte) (handl
 }
 
 // Render handles the standard response→output flow:
-//   - status != v.Status (or 200 if unset) → apiclient.ParseError
+//   - status != v.Status (or 200 if unset) → api.ParseError
 //   - --output=json → write raw body
 //   - otherwise → render the bound template against data
 func (v View) Render(w io.Writer, statusCode int, body []byte, data any) error {
