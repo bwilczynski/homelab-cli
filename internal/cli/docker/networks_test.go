@@ -39,7 +39,7 @@ func TestListNetworksCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListNetworksCmd()
+	cmd := newListNetworksCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -75,7 +75,7 @@ func TestGetNetworkCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetNetworkCmd()
+	cmd := newGetNetworkCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.immich_default"})
 	buf := &bytes.Buffer{}

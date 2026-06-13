@@ -1,20 +1,12 @@
 package docker
 
 import (
-	"github.com/bwilczynski/hlctl/internal/api"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{Use: "docker", Short: "Docker resources"}
-	cmd.AddCommand(newContainersCmd(), newNetworksCmd(), newImagesCmd())
+	cmd.AddCommand(newContainersCmd(f), newNetworksCmd(f), newImagesCmd(f))
 	return cmd
-}
-
-func buildClient() (DockerClient, error) {
-	httpClient, apiURL, err := api.NewHTTPClient()
-	if err != nil {
-		return nil, err
-	}
-	return NewDockerClient(httpClient, apiURL)
 }

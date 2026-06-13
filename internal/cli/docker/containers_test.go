@@ -59,7 +59,7 @@ func TestListContainersCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListContainersCmd()
+	cmd := newListContainersCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -87,7 +87,7 @@ func TestListContainersCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListContainersCmd()
+	cmd := newListContainersCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -121,7 +121,7 @@ func TestGetContainerCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetContainerCmd()
+	cmd := newGetContainerCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}

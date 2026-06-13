@@ -40,7 +40,7 @@ func TestListImagesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListImagesCmd()
+	cmd := newListImagesCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -72,7 +72,7 @@ func TestGetImageCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetImageCmd()
+	cmd := newGetImageCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.925ff61909ae"})
 	buf := &bytes.Buffer{}
