@@ -3,195 +3,205 @@ package docker
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 
 	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil/httpmock"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
-func okContainersResp(list dockerapi.ContainerList) *dockerapi.ListContainersResponse {
-	b, _ := json.Marshal(list)
-	return &dockerapi.ListContainersResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
-
-func errContainersResp(status int, body map[string]any) *dockerapi.ListContainersResponse {
-	b, _ := json.Marshal(body)
-	return &dockerapi.ListContainersResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
-}
-
-func okContainerResp(detail dockerapi.ContainerDetail) *dockerapi.GetContainerResponse {
-	b, _ := json.Marshal(detail)
-	return &dockerapi.GetContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
-}
-
-func noContentStartResp() *dockerapi.StartContainerResponse {
-	return &dockerapi.StartContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
-}
-
-func noContentStopResp() *dockerapi.StopContainerResponse {
-	return &dockerapi.StopContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
-}
-
-func noContentRestartResp() *dockerapi.RestartContainerResponse {
-	return &dockerapi.RestartContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
-}
-
-func TestListContainersCmd_tableOutput(t *testing.T) {
-	list := dockerapi.ContainerList{
-		Items: []dockerapi.Container{
-			{
-				Id:     "nas-1.homeassistant",
-				Image:  "homeassistant/home-assistant:latest",
-				Status: dockerapi.Running,
-				Resources: dockerapi.ContainerResources{
-					CpuPercent:  1.5,
-					MemoryBytes: 104857600,
-				},
-			},
-		},
+func testHTTPClient(reg *httpmock.Registry) func() (*http.Client, string, error) {
+	return func() (*http.Client, string, error) {
+		return &http.Client{Transport: reg}, "http://localhost", nil
 	}
-	stub := &StubClient{
-		ListContainersWithResponseFunc: func(_ context.Context, _ *dockerapi.ListContainersParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.ListContainersResponse, error) {
-			return okContainersResp(list), nil
-		},
-	}
+}
 
-	cmd := newListContainersCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[DockerClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+// Layer 1: flag/arg parsing
+
+func TestNewListContainersCmd_deviceFlag(t *testing.T) {
+	var captured *listContainersOptions
+	cmd := newListContainersCmd(cmdutil.TestFactory(t), func(o *listContainersOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"--device", "nas-1"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
-	for _, want := range []string{"nas-1.homeassistant", "homeassistant/home-assistant:latest", "running", "1.5%"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
-		}
+	if captured.Device != "nas-1" {
+		t.Errorf("expected Device=nas-1, got %q", captured.Device)
 	}
 }
 
-func TestListContainersCmd_apiError(t *testing.T) {
-	stub := &StubClient{
-		ListContainersWithResponseFunc: func(_ context.Context, _ *dockerapi.ListContainersParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.ListContainersResponse, error) {
-			return errContainersResp(http.StatusUnauthorized, map[string]any{
-				"type":   "https://homelab.local/problems/unauthorized",
-				"title":  "Unauthorized",
-				"status": 401,
-				"detail": "Bearer token missing",
-			}), nil
-		},
+func TestNewGetContainerCmd_argParsed(t *testing.T) {
+	var captured *getContainerOptions
+	cmd := newGetContainerCmd(cmdutil.TestFactory(t), func(o *getContainerOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"nas-1.homeassistant"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	cmd := newListContainersCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[DockerClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
+	if captured.ID != "nas-1.homeassistant" {
+		t.Errorf("expected ID=nas-1.homeassistant, got %q", captured.ID)
+	}
+}
+
+func TestNewStartContainerCmd_argParsed(t *testing.T) {
+	var captured *startContainerOptions
+	cmd := newStartContainerCmd(cmdutil.TestFactory(t), func(o *startContainerOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"nas-1.homeassistant"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured.ID != "nas-1.homeassistant" {
+		t.Errorf("expected ID=nas-1.homeassistant, got %q", captured.ID)
+	}
+}
+
+// Layer 2: business logic
+
+func TestListContainersRun_tableOutput(t *testing.T) {
+	list := dockerapi.ContainerList{
+		Items: []dockerapi.Container{{
+			Id:        "nas-1.homeassistant",
+			Image:     "homeassistant/home-assistant:latest",
+			Status:    dockerapi.Running,
+			Resources: dockerapi.ContainerResources{CpuPercent: 1.5, MemoryBytes: 104857600},
+		}},
+	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/docker/containers"), httpmock.JSONResponse(list))
+
+	var out bytes.Buffer
+	opts := &listContainersOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	if err := listContainersRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"nas-1.homeassistant", "homeassistant/home-assistant:latest", "running", "1.5%"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
+		}
+	}
+	reg.Verify(t)
+}
+
+func TestListContainersRun_apiError(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(
+		httpmock.REST("GET", "/docker/containers"),
+		httpmock.StatusJSONResponse(http.StatusUnauthorized, map[string]any{
+			"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized", "status": 401, "detail": "Bearer token missing",
+		}),
+	)
+	var out bytes.Buffer
+	opts := &listContainersOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	err := listContainersRun(context.Background(), &out, opts)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "Unauthorized") {
 		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
 	}
+	reg.Verify(t)
 }
 
-func TestGetContainerCmd_tableOutput(t *testing.T) {
+func TestGetContainerRun_tableOutput(t *testing.T) {
 	detail := dockerapi.ContainerDetail{
-		Id:            "nas-1.homeassistant",
-		Name:          "homeassistant",
-		Device:        "nas-1",
-		Status:        dockerapi.Running,
-		Image:         "homeassistant/home-assistant:latest",
+		Id: "nas-1.homeassistant", Name: "homeassistant", Device: "nas-1",
+		Status: dockerapi.Running, Image: "homeassistant/home-assistant:latest",
 		RestartPolicy: dockerapi.Always,
-		Resources: dockerapi.ContainerResources{
-			CpuPercent:    1.5,
-			MemoryBytes:   104857600,
-			MemoryPercent: 5.0,
-		},
+		Resources:     dockerapi.ContainerResources{CpuPercent: 1.5, MemoryBytes: 104857600, MemoryPercent: 5.0},
 	}
-	stub := &StubClient{
-		GetContainerWithResponseFunc: func(_ context.Context, _ string, _ ...dockerapi.RequestEditorFn) (*dockerapi.GetContainerResponse, error) {
-			return okContainerResp(detail), nil
-		},
-	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/docker/containers/*"), httpmock.JSONResponse(detail))
 
-	cmd := newGetContainerCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[DockerClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.homeassistant"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &getContainerOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "nas-1.homeassistant",
+	}
+	if err := getContainerRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
 	for _, want := range []string{"nas-1.homeassistant", "homeassistant", "running", "always"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }
 
-func TestStartContainerCmd(t *testing.T) {
-	stub := &StubClient{
-		StartContainerWithResponseFunc: func(_ context.Context, _ string, _ *dockerapi.StartContainerParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.StartContainerResponse, error) {
-			return noContentStartResp(), nil
-		},
+func TestStartContainerRun(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("POST", "/docker/containers/*:start"), httpmock.StatusStringResponse(http.StatusNoContent, ""))
+
+	var out bytes.Buffer
+	opts := &startContainerOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		ID:         "nas-1.homeassistant",
 	}
-	cmd := newStartContainerCmd()
-	cmdutil.SetClient[DockerClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.homeassistant"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	if err := cmd.Execute(); err != nil {
+	if err := startContainerRun(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "started") {
-		t.Errorf("expected 'started' in output, got: %s", buf.String())
+	if !strings.Contains(out.String(), "nas-1.homeassistant started") {
+		t.Errorf("expected 'started' in output, got: %s", out.String())
 	}
+	reg.Verify(t)
 }
 
-func TestStopContainerCmd(t *testing.T) {
-	stub := &StubClient{
-		StopContainerWithResponseFunc: func(_ context.Context, _ string, _ *dockerapi.StopContainerParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.StopContainerResponse, error) {
-			return noContentStopResp(), nil
-		},
+func TestStopContainerRun(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("POST", "/docker/containers/*:stop"), httpmock.StatusStringResponse(http.StatusNoContent, ""))
+
+	var out bytes.Buffer
+	opts := &stopContainerOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		ID:         "nas-1.homeassistant",
 	}
-	cmd := newStopContainerCmd()
-	cmdutil.SetClient[DockerClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.homeassistant"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	if err := cmd.Execute(); err != nil {
+	if err := stopContainerRun(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "stopped") {
-		t.Errorf("expected 'stopped' in output, got: %s", buf.String())
+	if !strings.Contains(out.String(), "nas-1.homeassistant stopped") {
+		t.Errorf("expected 'stopped' in output, got: %s", out.String())
 	}
+	reg.Verify(t)
 }
 
-func TestRestartContainerCmd(t *testing.T) {
-	stub := &StubClient{
-		RestartContainerWithResponseFunc: func(_ context.Context, _ string, _ *dockerapi.RestartContainerParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.RestartContainerResponse, error) {
-			return noContentRestartResp(), nil
-		},
+func TestRestartContainerRun(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("POST", "/docker/containers/*:restart"), httpmock.StatusStringResponse(http.StatusNoContent, ""))
+
+	var out bytes.Buffer
+	opts := &restartContainerOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		ID:         "nas-1.homeassistant",
 	}
-	cmd := newRestartContainerCmd()
-	cmdutil.SetClient[DockerClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.homeassistant"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	if err := cmd.Execute(); err != nil {
+	if err := restartContainerRun(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "restarted") {
-		t.Errorf("expected 'restarted' in output, got: %s", buf.String())
+	if !strings.Contains(out.String(), "nas-1.homeassistant restarted") {
+		t.Errorf("expected 'restarted' in output, got: %s", out.String())
 	}
+	reg.Verify(t)
 }

@@ -1,8 +1,13 @@
 package docker
 
 import (
+	"context"
+	"io"
+	"net/http"
+
 	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -11,44 +16,90 @@ var (
 	imagesGetView  = cmdutil.View{Templates: dockerTemplates, Name: "images_get.tmpl"}
 )
 
+type listImagesOptions struct {
+	HTTPClient func() (*http.Client, string, error)
+	IO         *cmdutil.IOStreams
+	Output     func() output.Format
+	Device     string
+}
+
 func newImagesCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{Use: "images", Short: "Docker images"}
-	cmdutil.InjectClient(cmd, func() (DockerClient, error) {
-		httpClient, apiURL, err := f.HTTPClient()
-		if err != nil {
-			return nil, err
-		}
-		return NewDockerClient(httpClient, apiURL)
-	})
-	cmd.AddCommand(newListImagesCmd(f), newGetImageCmd(f))
+	cmd.AddCommand(newListImagesCmd(f, nil), newGetImageCmd(f, nil))
 	return cmd
 }
 
-func newListImagesCmd(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{Use: "list", Short: "List Docker images"}
-	device := cmdutil.DeviceFlag(cmd)
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		params := &dockerapi.ListDockerImagesParams{}
-		if *device != "" {
-			params.Device = device
-		}
-		resp, err := cmdutil.Client[DockerClient](cmd).ListDockerImagesWithResponse(cmd.Context(), params)
-		if err != nil {
-			return err
-		}
-		return imagesListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
+func newListImagesCmd(f *cmdutil.Factory, runF func(*listImagesOptions) error) *cobra.Command {
+	opts := &listImagesOptions{HTTPClient: f.HTTPClient, IO: f.IOStreams, Output: f.Output}
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List Docker images",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if runF != nil {
+				return runF(opts)
+			}
+			return listImagesRun(cmd.Context(), opts.IO.Out, opts)
+		},
 	}
+	cmd.Flags().StringVar(&opts.Device, "device", "", "Filter by device ID")
 	return cmd
 }
 
-func newGetImageCmd(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{Use: "get <image-id>", Short: "Show image details", Args: cobra.ExactArgs(1)}
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		resp, err := cmdutil.Client[DockerClient](cmd).GetDockerImageWithResponse(cmd.Context(), args[0])
-		if err != nil {
-			return err
-		}
-		return imagesGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
+func listImagesRun(ctx context.Context, w io.Writer, opts *listImagesOptions) error {
+	httpClient, apiURL, err := opts.HTTPClient()
+	if err != nil {
+		return err
 	}
-	return cmd
+	c, err := NewDockerClient(httpClient, apiURL)
+	if err != nil {
+		return err
+	}
+	params := &dockerapi.ListDockerImagesParams{}
+	if opts.Device != "" {
+		params.Device = &opts.Device
+	}
+	resp, err := c.ListDockerImagesWithResponse(ctx, params)
+	if err != nil {
+		return err
+	}
+	return imagesListView.Render(w, opts.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
+}
+
+type getImageOptions struct {
+	HTTPClient func() (*http.Client, string, error)
+	IO         *cmdutil.IOStreams
+	Output     func() output.Format
+	ID         string
+}
+
+func newGetImageCmd(f *cmdutil.Factory, runF func(*getImageOptions) error) *cobra.Command {
+	opts := &getImageOptions{HTTPClient: f.HTTPClient, IO: f.IOStreams, Output: f.Output}
+	return &cobra.Command{
+		Use:   "get <image-id>",
+		Short: "Show image details",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.ID = args[0]
+			if runF != nil {
+				return runF(opts)
+			}
+			return getImageRun(cmd.Context(), opts.IO.Out, opts)
+		},
+	}
+}
+
+func getImageRun(ctx context.Context, w io.Writer, opts *getImageOptions) error {
+	httpClient, apiURL, err := opts.HTTPClient()
+	if err != nil {
+		return err
+	}
+	c, err := NewDockerClient(httpClient, apiURL)
+	if err != nil {
+		return err
+	}
+	resp, err := c.GetDockerImageWithResponse(ctx, opts.ID)
+	if err != nil {
+		return err
+	}
+	return imagesGetView.Render(w, opts.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 }
