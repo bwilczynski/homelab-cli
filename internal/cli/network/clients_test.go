@@ -53,7 +53,8 @@ func TestListClientsCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListClientsCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListClientsCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -81,7 +82,8 @@ func TestListClientsCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListClientsCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListClientsCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -104,7 +106,8 @@ func TestListClientsCmd_statusFilter(t *testing.T) {
 		},
 	}
 
-	cmd := newListClientsCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListClientsCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"--status", "online"})
 	buf := &bytes.Buffer{}
@@ -137,7 +140,8 @@ func TestGetClientCmd_wired(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetClientCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:01"})
 	buf := &bytes.Buffer{}
@@ -172,7 +176,8 @@ func TestGetClientCmd_wireless(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetClientCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:02"})
 	buf := &bytes.Buffer{}
@@ -205,7 +210,8 @@ func TestGetClientCmd_offline_wired(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetClientCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:03"})
 	buf := &bytes.Buffer{}
@@ -241,7 +247,8 @@ func TestGetClientCmd_offline_wireless(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetClientCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.aa:bb:cc:dd:ee:04"})
 	buf := &bytes.Buffer{}
@@ -274,7 +281,8 @@ func TestGetClientCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetClientCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetClientCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}

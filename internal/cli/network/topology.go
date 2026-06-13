@@ -7,7 +7,6 @@ import (
 
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
@@ -27,7 +26,7 @@ type topologyEdge struct {
 	EdgeDisp string
 }
 
-func newTopologyCmd() *cobra.Command {
+func newTopologyCmd(f *cmdutil.Factory) *cobra.Command {
 	var includeClients bool
 	var includeWireless bool
 
@@ -35,7 +34,7 @@ func newTopologyCmd() *cobra.Command {
 		Use:   "topology",
 		Short: "Show network topology",
 	}
-	cmd.RunE = watch.Wrap(flags.GetOutputFormat, func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(func() output.Format { return f.Output() }, func(ctx context.Context, w io.Writer) error {
 		params := &networkapi.GetNetworkTopologyParams{}
 		if includeClients || includeWireless {
 			t := true
@@ -46,7 +45,7 @@ func newTopologyCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return topologyView.RenderWith(w, flags.GetOutputFormat(), resp.StatusCode(), resp.Body, func() (any, error) {
+		return topologyView.RenderWith(w, f.Output(), resp.StatusCode(), resp.Body, func() (any, error) {
 			return buildTopologyTree(*resp.JSON200, includeWireless)
 		})
 	})

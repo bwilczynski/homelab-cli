@@ -1,30 +1,27 @@
 package network
 
 import (
-	"github.com/bwilczynski/hlctl/internal/api"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "network",
 		Short: "Network devices and clients",
 	}
-	cmdutil.InjectClient(cmd, buildClient)
-	cmd.AddCommand(newDevicesCmd())
-	cmd.AddCommand(newClientsCmd())
-	cmd.AddCommand(newTopologyCmd())
-	cmd.AddCommand(newVlansCmd())
-	cmd.AddCommand(newSsidsCmd())
-	cmd.AddCommand(newWansCmd())
+	cmdutil.InjectClient(cmd, func() (NetworkClient, error) {
+		httpClient, apiURL, err := f.HTTPClient()
+		if err != nil {
+			return nil, err
+		}
+		return NewNetworkClient(httpClient, apiURL)
+	})
+	cmd.AddCommand(newDevicesCmd(f))
+	cmd.AddCommand(newClientsCmd(f))
+	cmd.AddCommand(newTopologyCmd(f))
+	cmd.AddCommand(newVlansCmd(f))
+	cmd.AddCommand(newSsidsCmd(f))
+	cmd.AddCommand(newWansCmd(f))
 	return cmd
-}
-
-func buildClient() (NetworkClient, error) {
-	httpClient, apiURL, err := api.NewHTTPClient()
-	if err != nil {
-		return nil, err
-	}
-	return NewNetworkClient(httpClient, apiURL)
 }

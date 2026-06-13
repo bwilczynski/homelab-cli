@@ -3,7 +3,6 @@ package network
 import (
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -58,17 +57,17 @@ func buildSwitchPortViews(ports []networkapi.SwitchPort, allPorts bool) ([]switc
 	return out, nil
 }
 
-func newDevicesCmd() *cobra.Command {
+func newDevicesCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "devices",
 		Short: "Network devices",
 	}
-	cmd.AddCommand(newListDevicesCmd())
-	cmd.AddCommand(newGetDeviceCmd())
+	cmd.AddCommand(newListDevicesCmd(f))
+	cmd.AddCommand(newGetDeviceCmd(f))
 	return cmd
 }
 
-func newListDevicesCmd() *cobra.Command {
+func newListDevicesCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List network devices",
@@ -77,12 +76,12 @@ func newListDevicesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return devicesListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return devicesListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
 
-func newGetDeviceCmd() *cobra.Command {
+func newGetDeviceCmd(f *cmdutil.Factory) *cobra.Command {
 	var allPorts bool
 	cmd := &cobra.Command{
 		Use:   "get <device-id>",
@@ -126,7 +125,7 @@ func newGetDeviceCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return view.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return view.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 	cmd.Flags().BoolVar(&allPorts, "all-ports", false, "Show all ports (default: active ports only)")

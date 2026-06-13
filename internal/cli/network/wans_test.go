@@ -45,7 +45,8 @@ func TestListWansCmd_tableOutput(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListWansCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListWansCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -70,7 +71,8 @@ func TestListWansCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListWansCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListWansCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -95,7 +97,8 @@ func TestGetWanCmd_connected(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetWanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetWanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.wan1"})
 	buf := &bytes.Buffer{}
@@ -121,7 +124,8 @@ func TestGetWanCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetWanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetWanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}

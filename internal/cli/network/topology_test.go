@@ -10,7 +10,7 @@ import (
 
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
 func okTopologyResp(data map[string]any) *networkapi.GetNetworkTopologyResponse {
@@ -65,7 +65,8 @@ func TestTopologyCmd_devicesOnly(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newTopologyCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -136,7 +137,8 @@ func TestTopologyCmd_includeClientsWiredOnly(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newTopologyCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"--include-clients"})
 	buf := &bytes.Buffer{}
@@ -191,7 +193,8 @@ func TestTopologyCmd_includeWireless(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newTopologyCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"--include-wireless"})
 	buf := &bytes.Buffer{}
@@ -210,10 +213,6 @@ func TestTopologyCmd_includeWireless(t *testing.T) {
 }
 
 func TestTopologyCmd_jsonOutput(t *testing.T) {
-	old := flags.OutputFormat
-	flags.OutputFormat = "json"
-	defer func() { flags.OutputFormat = old }()
-
 	stub := &StubClient{
 		GetNetworkTopologyWithResponseFunc: func(_ context.Context, _ *networkapi.GetNetworkTopologyParams, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkTopologyResponse, error) {
 			return okTopologyResp(map[string]any{
@@ -223,7 +222,9 @@ func TestTopologyCmd_jsonOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd()
+	f := cmdutil.TestFactory(t)
+	f.Output = func() output.Format { return output.FormatJSON }
+	cmd := newTopologyCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -250,7 +251,8 @@ func TestTopologyCmd_apiError(t *testing.T) {
 		},
 	}
 
-	cmd := newTopologyCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newTopologyCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)

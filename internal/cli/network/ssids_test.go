@@ -53,7 +53,8 @@ func TestListSsidsCmd_tableOutput(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListSsidsCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListSsidsCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -78,7 +79,8 @@ func TestListSsidsCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListSsidsCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListSsidsCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -111,7 +113,8 @@ func TestGetSsidCmd_withClients(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetSsidCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetSsidCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.iot"})
 	buf := &bytes.Buffer{}
@@ -137,7 +140,8 @@ func TestGetSsidCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetSsidCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetSsidCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}

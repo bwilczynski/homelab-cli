@@ -57,7 +57,8 @@ func TestListDevicesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListDevicesCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListDevicesCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -88,7 +89,8 @@ func TestListDevicesCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListDevicesCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListDevicesCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -117,7 +119,8 @@ func TestGetDeviceCmd_gateway(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetDeviceCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.usg"})
 	buf := &bytes.Buffer{}
@@ -158,7 +161,8 @@ func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetDeviceCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.mystery"})
 	buf := &bytes.Buffer{}
@@ -202,7 +206,8 @@ func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetDeviceCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.switch-lr"})
 	buf := &bytes.Buffer{}
@@ -239,7 +244,8 @@ func TestGetDeviceCmd_switch_allPorts(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetDeviceCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.switch-lr", "--all-ports"})
 	buf := &bytes.Buffer{}
@@ -275,7 +281,8 @@ func TestGetDeviceCmd_accessPoint(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetDeviceCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetDeviceCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.ap-living-room"})
 	buf := &bytes.Buffer{}

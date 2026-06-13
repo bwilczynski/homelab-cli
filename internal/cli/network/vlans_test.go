@@ -45,7 +45,8 @@ func TestListVlansCmd_tableOutput(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListVlansCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListVlansCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -70,7 +71,8 @@ func TestListVlansCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListVlansCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListVlansCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -97,7 +99,8 @@ func TestGetVlanCmd_serverDhcp(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetVlanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.iot"})
 	buf := &bytes.Buffer{}
@@ -129,7 +132,8 @@ func TestGetVlanCmd_relayDhcp(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetVlanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.mgmt"})
 	buf := &bytes.Buffer{}
@@ -158,7 +162,8 @@ func TestGetVlanCmd_notFound(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetVlanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}
@@ -185,7 +190,8 @@ func TestGetVlanCmd_disabledDhcp(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetVlanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetVlanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.servers"})
 	buf := &bytes.Buffer{}

@@ -24,7 +24,7 @@ func init() {
 	rootCmd.AddCommand(auth.NewCmd(nil)) // nil replaced by Task 14's NewRootCmd(f)
 	rootCmd.AddCommand(config.NewCmd(nil))
 	rootCmd.AddCommand(dockercli.NewCmd(nil)) // nil replaced by Task 14's NewRootCmd(f)
-	rootCmd.AddCommand(network.NewCmd())
+	rootCmd.AddCommand(network.NewCmd(nil))
 	rootCmd.AddCommand(storage.NewCmd())
 	rootCmd.AddCommand(system.NewCmd(nil))
 }

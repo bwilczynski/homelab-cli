@@ -6,8 +6,8 @@ import (
 
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
+	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -29,23 +29,23 @@ var (
 	}
 )
 
-func newClientsCmd() *cobra.Command {
+func newClientsCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clients",
 		Short: "Network clients",
 	}
-	cmd.AddCommand(newListClientsCmd())
-	cmd.AddCommand(newGetClientCmd())
+	cmd.AddCommand(newListClientsCmd(f))
+	cmd.AddCommand(newGetClientCmd(f))
 	return cmd
 }
 
-func newListClientsCmd() *cobra.Command {
+func newListClientsCmd(f *cmdutil.Factory) *cobra.Command {
 	var statusFilter string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List network clients",
 	}
-	cmd.RunE = watch.Wrap(flags.GetOutputFormat, func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(func() output.Format { return f.Output() }, func(ctx context.Context, w io.Writer) error {
 		params := &networkapi.ListNetworkClientsParams{}
 		if statusFilter != "" {
 			s := networkapi.NetworkClientStatus(statusFilter)
@@ -56,14 +56,14 @@ func newListClientsCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return clientsListView.Render(w, flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return clientsListView.Render(w, f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 	})
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
 	watch.RegisterFlags(cmd)
 	return cmd
 }
 
-func newGetClientCmd() *cobra.Command {
+func newGetClientCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <client-id>",
 		Short: "Show network client details",
@@ -73,7 +73,7 @@ func newGetClientCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return clientGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return clientGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
