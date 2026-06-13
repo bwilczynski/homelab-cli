@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,29 +10,45 @@ import (
 
 	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil/httpmock"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
-func okBackupsResp(list storageapi.BackupTaskList) *storageapi.ListBackupsResponse {
-	b, _ := json.Marshal(list)
-	return &storageapi.ListBackupsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+// Layer 1: flag/arg parsing
+
+func TestNewListBackupsCmd_deviceFlag(t *testing.T) {
+	var captured *listBackupsOptions
+	cmd := newListBackupsCmd(cmdutil.TestFactory(t), func(o *listBackupsOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"--device", "nas-1"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured.Device != "nas-1" {
+		t.Errorf("expected Device=nas-1, got %q", captured.Device)
+	}
 }
 
-func errBackupsResp(status int, body map[string]any) *storageapi.ListBackupsResponse {
-	b, _ := json.Marshal(body)
-	return &storageapi.ListBackupsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+func TestNewGetBackupCmd_argParsed(t *testing.T) {
+	var captured *getBackupOptions
+	cmd := newGetBackupCmd(cmdutil.TestFactory(t), func(o *getBackupOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"nas-1.daily-backup"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured.ID != "nas-1.daily-backup" {
+		t.Errorf("expected ID=nas-1.daily-backup, got %q", captured.ID)
+	}
 }
 
-func okBackupResp(data storageapi.BackupTaskDetail) *storageapi.GetBackupResponse {
-	b, _ := json.Marshal(data)
-	return &storageapi.GetBackupResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
-}
+// Layer 2: business logic
 
-func errBackupResp(status int, body map[string]any) *storageapi.GetBackupResponse {
-	b, _ := json.Marshal(body)
-	return &storageapi.GetBackupResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
-}
-
-func TestListBackupsCmd_tableOutput(t *testing.T) {
+func TestListBackupsRun_tableOutput(t *testing.T) {
 	list := storageapi.BackupTaskList{
 		Items: []storageapi.BackupTask{
 			{
@@ -46,55 +61,51 @@ func TestListBackupsCmd_tableOutput(t *testing.T) {
 			},
 		},
 	}
-	stub := &StubClient{
-		ListBackupsWithResponseFunc: func(_ context.Context, _ *storageapi.ListBackupsParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListBackupsResponse, error) {
-			return okBackupsResp(list), nil
-		},
-	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/storage/backups"), httpmock.JSONResponse(list))
 
-	cmd := newListBackupsCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &listBackupsOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	if err := listBackupsRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
 	for _, want := range []string{"nas-1.daily-backup", "Daily Backup", "nas-1", "idle", "success", "hyperBackup"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }
 
-func TestListBackupsCmd_apiError(t *testing.T) {
-	stub := &StubClient{
-		ListBackupsWithResponseFunc: func(_ context.Context, _ *storageapi.ListBackupsParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListBackupsResponse, error) {
-			return errBackupsResp(http.StatusUnauthorized, map[string]any{
-				"type":   "https://homelab.local/problems/unauthorized",
-				"title":  "Unauthorized",
-				"status": 401,
-				"detail": "Bearer token missing",
-			}), nil
-		},
+func TestListBackupsRun_apiError(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(
+		httpmock.REST("GET", "/storage/backups"),
+		httpmock.StatusJSONResponse(http.StatusUnauthorized, map[string]any{
+			"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized", "status": 401, "detail": "Bearer token missing",
+		}),
+	)
+	var out bytes.Buffer
+	opts := &listBackupsOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
 	}
-	cmd := newListBackupsCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
+	err := listBackupsRun(context.Background(), &out, opts)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "Unauthorized") {
 		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
 	}
+	reg.Verify(t)
 }
 
-func TestGetBackupCmd_withDates(t *testing.T) {
+func TestGetBackupRun_withDates(t *testing.T) {
 	lastRun := time.Date(2026, 4, 30, 3, 0, 0, 0, time.UTC)
 	nextRun := time.Date(2026, 5, 1, 3, 0, 0, 0, time.UTC)
 	detail := storageapi.BackupTaskDetail{
@@ -107,31 +118,28 @@ func TestGetBackupCmd_withDates(t *testing.T) {
 		LastRunAt:  &lastRun,
 		NextRunAt:  &nextRun,
 	}
-	stub := &StubClient{
-		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetBackupResponse, error) {
-			return okBackupResp(detail), nil
-		},
-	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/storage/backups/*"), httpmock.JSONResponse(detail))
 
-	cmd := newGetBackupCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.daily-backup"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &getBackupOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "nas-1.daily-backup",
+	}
+	if err := getBackupRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
 	for _, want := range []string{"nas-1.daily-backup", "hyperBackup", "LAST RUN", "NEXT RUN", "2026-04-30", "2026-05-01"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }
 
-func TestGetBackupCmd_withSizeAndFolders(t *testing.T) {
+func TestGetBackupRun_withSizeAndFolders(t *testing.T) {
 	size := storageapi.Bytes(10737418240)
 	folders := []string{"/volume1/photos", "/volume1/documents"}
 	detail := storageapi.BackupTaskDetail{
@@ -144,52 +152,48 @@ func TestGetBackupCmd_withSizeAndFolders(t *testing.T) {
 		Size:       &size,
 		Folders:    &folders,
 	}
-	stub := &StubClient{
-		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetBackupResponse, error) {
-			return okBackupResp(detail), nil
-		},
-	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/storage/backups/*"), httpmock.JSONResponse(detail))
 
-	cmd := newGetBackupCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.daily-backup"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &getBackupOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "nas-1.daily-backup",
+	}
+	if err := getBackupRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
 	for _, want := range []string{"SIZE", "10.0 GB", "FOLDERS", "/volume1/photos", "/volume1/documents"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }
 
-func TestGetBackupCmd_apiError(t *testing.T) {
-	stub := &StubClient{
-		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetBackupResponse, error) {
-			return errBackupResp(http.StatusNotFound, map[string]any{
-				"type":   "https://homelab.local/problems/not-found",
-				"title":  "Not Found",
-				"status": 404,
-				"detail": "backup 'nas-1.foo' not found",
-			}), nil
-		},
+func TestGetBackupRun_apiError(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(
+		httpmock.REST("GET", "/storage/backups/*"),
+		httpmock.StatusJSONResponse(http.StatusNotFound, map[string]any{
+			"type": "https://homelab.local/problems/not-found", "title": "Not Found", "status": 404, "detail": "backup 'nas-1.foo' not found",
+		}),
+	)
+	var out bytes.Buffer
+	opts := &getBackupOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "nas-1.foo",
 	}
-	cmd := newGetBackupCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.foo"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
+	err := getBackupRun(context.Background(), &out, opts)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "Not Found") {
 		t.Errorf("expected 'Not Found' in error, got: %v", err)
 	}
+	reg.Verify(t)
 }
