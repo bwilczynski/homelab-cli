@@ -48,7 +48,7 @@ func TestListVolumesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListVolumesCmd()
+	cmd := newListVolumesCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -76,7 +76,7 @@ func TestListVolumesCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListVolumesCmd()
+	cmd := newListVolumesCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -109,7 +109,7 @@ func TestGetVolumeCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newGetVolumeCmd()
+	cmd := newGetVolumeCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.volume1"})
 	buf := &bytes.Buffer{}

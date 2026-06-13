@@ -3,7 +3,6 @@ package storage
 import (
 	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -12,14 +11,20 @@ var (
 	backupsGetView  = cmdutil.View{Templates: storageTemplates, Name: "backups_get.tmpl"}
 )
 
-func newBackupsCmd() *cobra.Command {
+func newBackupsCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{Use: "backups", Short: "Backup tasks and history"}
-	cmdutil.InjectClient(cmd, buildClient)
-	cmd.AddCommand(newListBackupsCmd(), newGetBackupCmd())
+	cmdutil.InjectClient(cmd, func() (StorageClient, error) {
+		httpClient, apiURL, err := f.HTTPClient()
+		if err != nil {
+			return nil, err
+		}
+		return NewStorageClient(httpClient, apiURL)
+	})
+	cmd.AddCommand(newListBackupsCmd(f), newGetBackupCmd(f))
 	return cmd
 }
 
-func newListBackupsCmd() *cobra.Command {
+func newListBackupsCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{Use: "list", Short: "List backups"}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
@@ -31,19 +36,19 @@ func newListBackupsCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return backupsListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return backupsListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
 
-func newGetBackupCmd() *cobra.Command {
+func newGetBackupCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{Use: "get <backup-id>", Short: "Show backup details", Args: cobra.ExactArgs(1)}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		resp, err := cmdutil.Client[StorageClient](cmd).GetBackupWithResponse(cmd.Context(), args[0])
 		if err != nil {
 			return err
 		}
-		return backupsGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return backupsGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }

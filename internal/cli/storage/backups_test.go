@@ -52,7 +52,7 @@ func TestListBackupsCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListBackupsCmd()
+	cmd := newListBackupsCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -80,7 +80,7 @@ func TestListBackupsCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListBackupsCmd()
+	cmd := newListBackupsCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -113,7 +113,7 @@ func TestGetBackupCmd_withDates(t *testing.T) {
 		},
 	}
 
-	cmd := newGetBackupCmd()
+	cmd := newGetBackupCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.daily-backup"})
 	buf := &bytes.Buffer{}
@@ -150,7 +150,7 @@ func TestGetBackupCmd_withSizeAndFolders(t *testing.T) {
 		},
 	}
 
-	cmd := newGetBackupCmd()
+	cmd := newGetBackupCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.daily-backup"})
 	buf := &bytes.Buffer{}
@@ -179,7 +179,7 @@ func TestGetBackupCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetBackupCmd()
+	cmd := newGetBackupCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.foo"})
 	buf := &bytes.Buffer{}
