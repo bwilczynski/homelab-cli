@@ -2,7 +2,7 @@
 
 ## Status
 
-**Designed, implementation deferred.** This document captures the agreed end-state for **Phase 1** — the scope-reduced refactor that delivers the structural wins (no package-level globals, explicit DI at the root, idiomatic layout) without rewriting tests. The migration plan will be drafted in a separate session when work is scheduled.
+**Designed, implementation plan drafted, execution deferred.** This document captures the agreed end-state for **Phase 1** — the scope-reduced refactor that delivers the structural wins (no package-level globals, explicit DI at the root, idiomatic layout) without rewriting tests. The 16-task implementation plan lives at `docs/superpowers/plans/2026-06-13-cli-refactor-phase-1.md`.
 
 A **Phase 2** that adopts the full gh-style per-command `Options` + `runF` + HTTP-transport mocking pattern is described at the end of this document. Phase 2 is independent of Phase 1 and can be deferred indefinitely or adopted opportunistically per-leaf.
 
@@ -117,10 +117,13 @@ type Factory struct {
     IOStreams *IOStreams
 
     Config     func() (*config.Config, error)
-    HTTPClient func() (*http.Client, string, error)  // returns client + resolved API URL
+    APIURL     func() (string, error)               // resolves --api-url flag → config
+    HTTPClient func() (*http.Client, string, error) // returns client + resolved API URL
     Output     func() output.Format
 }
 ```
+
+`APIURL` exists alongside `HTTPClient` so callers that only need the resolved URL (e.g. `auth login`, which builds its own OIDC discovery flow) don't pay for constructing a wasted `*http.Client`. `HTTPClient` internally delegates to `APIURL` for resolution.
 
 ### IOStreams
 
@@ -163,21 +166,25 @@ func NewFactory(version string, apiURLFlag, outputFlag *string) *Factory {
         cfgOnce.Do(func() { cfg, cfgErr = config.Load() })
         return cfg, cfgErr
     }
+    apiURLFn := func() (string, error) {
+        if *apiURLFlag != "" {
+            return *apiURLFlag, nil
+        }
+        c, err := loadConfig()
+        if err != nil {
+            return "", err
+        }
+        return c.ResolveAPIURL()
+    }
     return &Factory{
         Version:   version,
         IOStreams: SystemIOStreams(),
         Config:    loadConfig,
+        APIURL:    apiURLFn,
         HTTPClient: func() (*http.Client, string, error) {
-            c, err := loadConfig()
+            apiURL, err := apiURLFn()
             if err != nil {
                 return nil, "", err
-            }
-            apiURL := *apiURLFlag
-            if apiURL == "" {
-                apiURL, err = c.ResolveAPIURL()
-                if err != nil {
-                    return nil, "", err
-                }
             }
             return &http.Client{Transport: auth.NewAuthenticatedTransport(nil)}, apiURL, nil
         },
@@ -322,7 +329,7 @@ The injected closure is the only difference from today's `buildClient` function 
 func newListContainersCmd(f *cmdutil.Factory) *cobra.Command {
     cmd := &cobra.Command{Use: "list", Short: "List containers"}
     device := cmdutil.DeviceFlag(cmd)
-    cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+    cmd.RunE = watch.Wrap(f.Output, func(ctx context.Context, w io.Writer) error {
         params := &docker.ListContainersParams{}
         if *device != "" {
             params.Device = device
@@ -338,10 +345,11 @@ func newListContainersCmd(f *cmdutil.Factory) *cobra.Command {
 }
 ```
 
-Two diffs from today:
+Three diffs from today:
 
 1. Constructor gains `f *cmdutil.Factory`.
-2. `view.Render(...)` call gains `f.Output()` as a second argument (see *cmdutil.View signature change* below).
+2. `watch.Wrap(...)` call gains `f.Output` as a first argument (see *watch.Wrap signature change* below).
+3. `view.Render(...)` call gains `f.Output()` as a second argument (see *cmdutil.View signature change* below).
 
 The body otherwise stays identical: `cmdutil.Client[DockerClient](cmd)` continues to resolve via context-DI, just as it does today.
 
@@ -375,6 +383,20 @@ func (v View) Render(w io.Writer, outputFmt output.Format, statusCode int, body 
 ```
 
 Mechanical churn at every call site (the leaf passes `f.Output()`), but no semantic change. The same edit applies to `RenderWith` and `PolymorphicView.Render`.
+
+## `watch.Wrap` signature change
+
+`watch.Wrap` currently reads `flags.GetOutputFormat()` inside its loop to decide between NDJSON output and ANSI-based screen redraws. Deleting the `flags` package requires `watch.Wrap` to receive the output format from its caller instead. It gains a `getOutputFmt func() output.Format` parameter as its first argument — a closure rather than a value so it's read per-invocation (after flag parsing has completed).
+
+```go
+// Before
+func Wrap(fn TickFunc) func(*cobra.Command, []string) error
+
+// After
+func Wrap(getOutputFmt func() output.Format, fn TickFunc) func(*cobra.Command, []string) error
+```
+
+Leaf callers pass `f.Output` (the bare function, not called). The body of `Wrap` and its inner `loop` is otherwise unchanged; the one `flags.GetOutputFormat()` read becomes `getOutputFmt()`.
 
 ## Testing (Phase 1)
 
@@ -481,11 +503,17 @@ Before this refactor is considered complete, all of the following must hold:
 - [ ] Exit codes and error message formats are unchanged.
 - [ ] No package-level `var` of mutable state under `internal/cli/` (verifies via grep).
 
-## Open questions (defer to implementation phase)
+## Resolved implementation choices
 
-1. **Where `testFactory` lives** — exported `cmdutil.TestFactory(t)` (convenient, grows cmdutil's test surface) vs. duplicated per domain (more boilerplate but each domain owns its own seed). Decide during implementation.
-2. **Phasing within Phase 1** — whether to land the layout rename + codegen reorg as a separate PR before the Factory rewiring, or as one merge. The layout rename is mostly mechanical and could ship first to shrink the Factory PR's diff.
-3. **Whether `pflag.CommandLine` in `main` causes Cobra's auto-generated `--help` text to differ** from today's `PersistentFlags`-only setup. Verify before considering Phase 1 complete.
+The implementation plan (`docs/superpowers/plans/2026-06-13-cli-refactor-phase-1.md`) resolves the open questions this spec previously left for the implementation phase:
+
+1. **`testFactory` placement** — exported `cmdutil.TestFactory(t)` in `internal/cli/cmdutil/testfactory.go`. Single source of truth across domains.
+2. **Generated-code import alias** — `<domain>api` (e.g. `dockerapi`, `systemapi`). Replaces the generic `gen` alias used today; descriptive at every call site.
+3. **Phasing** — single sequence of 16 commits, all on one branch. Each task ends in a green `make build && make test`, so the work could be split into PRs at any task boundary if desired.
+
+## Open question still pending
+
+1. **Whether `pflag.CommandLine` in `main` causes Cobra's auto-generated `--help` text to differ** from today's `PersistentFlags`-only setup. The plan's Task 14 step 4 captures this as a verification step before considering Phase 1 complete.
 
 ---
 
@@ -630,7 +658,7 @@ Once Phase 2 ships across every domain:
 
 ## Phase 2 open questions (revisit when Phase 2 is scheduled)
 
-1. **`watch.Wrap` signature.** Today `watch.Wrap` takes a closure. Phase 2 likely wants `watch.Wrap(*watch.Options, closure)` so flag state lives in Options.
+1. **`watch.Wrap` reshape.** Phase 1 already changes `watch.Wrap` to take `getOutputFmt func() output.Format`. Phase 2 may want to push further to `watch.Wrap(*watch.Options, closure)` so flag state (interval, watch on/off) lives in the per-leaf Options struct alongside output format.
 2. **`view.Render` reshape.** Phase 1 already adds `outputFmt` as an argument. Phase 2 may want to bind it once into the View instead — decide based on how leaf code reads after the Options migration.
 3. **httpmock surface.** Phase 1's spec defines a minimum; richer matchers (header asserts, body asserts) can be added on demand.
 4. **Migration sequencing within Phase 2.** Per-domain rollout is the natural unit. Domains can be migrated in any order; mixed styles coexist via Phase 1's preserved cmdutil context-DI.
