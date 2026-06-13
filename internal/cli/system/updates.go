@@ -1,47 +1,47 @@
 package system
 
 import (
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/system"
 	"github.com/spf13/cobra"
 )
 
 var (
 	updatesListView = cmdutil.View{Templates: systemTemplates, Name: "updates_list.tmpl"}
-	updateGetView   = cmdutil.PolymorphicView[gen.SystemUpdateDetail]{
+	updateGetView   = cmdutil.PolymorphicView[systemapi.SystemUpdateDetail]{
 		Templates: systemTemplates,
-		Variants: map[string]cmdutil.Variant[gen.SystemUpdateDetail]{
+		Variants: map[string]cmdutil.Variant[systemapi.SystemUpdateDetail]{
 			"container": {
 				Template: "updates_get_container.tmpl",
-				Resolve:  func(d gen.SystemUpdateDetail) (any, error) { return d.AsContainerSystemUpdateDetail() },
+				Resolve:  func(d systemapi.SystemUpdateDetail) (any, error) { return d.AsContainerSystemUpdateDetail() },
 			},
 		},
 	}
 )
 
-func newUpdatesCmd() *cobra.Command {
+func newUpdatesCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "updates",
 		Short: "Software update tracking",
 	}
-	cmd.AddCommand(newListUpdatesCmd(), newGetUpdateCmd(), newCheckUpdatesCmd())
+	cmd.AddCommand(newListUpdatesCmd(f), newGetUpdateCmd(f), newCheckUpdatesCmd(f))
 	return cmd
 }
 
-func newListUpdatesCmd() *cobra.Command {
+func newListUpdatesCmd(f *cmdutil.Factory) *cobra.Command {
 	var status, updateType string
 
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List tracked software updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params := &gen.ListSystemUpdatesParams{}
+			params := &systemapi.ListSystemUpdatesParams{}
 			if status != "" {
-				s := gen.UpdateStatusFilter(status)
+				s := systemapi.UpdateStatusFilter(status)
 				params.Status = &s
 			}
 			if updateType != "" {
-				ut := gen.UpdateTypeFilter(updateType)
+				ut := systemapi.UpdateTypeFilter(updateType)
 				params.Type = &ut
 			}
 
@@ -49,7 +49,7 @@ func newListUpdatesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return updatesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return updatesListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 
@@ -58,7 +58,7 @@ func newListUpdatesCmd() *cobra.Command {
 	return cmd
 }
 
-func newGetUpdateCmd() *cobra.Command {
+func newGetUpdateCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <update-id>",
 		Short: "Show update details for a tracked component",
@@ -68,21 +68,21 @@ func newGetUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return updateGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return updateGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
 
-func newCheckUpdatesCmd() *cobra.Command {
+func newCheckUpdatesCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "check",
 		Short: "Force check for upstream updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resp, err := cmdutil.Client[SystemClient](cmd).CheckSystemUpdatesWithResponse(cmd.Context(), &gen.CheckSystemUpdatesParams{})
+			resp, err := cmdutil.Client[SystemClient](cmd).CheckSystemUpdatesWithResponse(cmd.Context(), &systemapi.CheckSystemUpdatesParams{})
 			if err != nil {
 				return err
 			}
-			return updatesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return updatesListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

@@ -31,36 +31,35 @@ make build
 
 - `cmd/hlctl/` — entrypoint
 - `internal/cli/` — Cobra command tree, root command
-- `internal/cli/flags/` — shared global flags (output format, api-url)
-- `internal/cli/cmdutil/` — shared command-construction helpers (client injection, View renderer, ActionCmd factory, DeviceFlag)
+- `internal/cli/cmdutil/` — shared command-construction helpers (client injection, View renderer, ActionCmd factory, DeviceFlag, Factory, IOStreams, TestFactory)
 - `internal/cli/<domain>/` — per-domain command packages (containers, system, storage, backups, network, config, login)
-- `internal/<domain>/` — generated oapi-codegen client code (gitignored)
+- `internal/api/<domain>/` — generated oapi-codegen client code (gitignored)
 - `internal/config/` — config file read/write (`~/.config/homelab/`)
 - `internal/auth/` — OAuth2 token storage and authenticated HTTP transport
 - `internal/output/` — table/JSON output formatting
 - `spec/` — git submodule pointing to `homelab-api-spec`
-- `oapi-codegen-*.yaml` — per-domain code generation configs
+- `codegen/<domain>.yaml` — per-domain code generation configs
 
 ## Adding a New Domain Command
 
-1. Create `internal/cli/<domain>/<domain>.go` with a `NewCmd() *cobra.Command` function.
+1. Create `internal/cli/<domain>/<domain>.go` with a `NewCmd(f *cmdutil.Factory) *cobra.Command` function.
 2. Declare a `cmdutil.View` value at the top of the file for each template:
    ```go
    var fooListView = cmdutil.View{Templates: <domain>Templates, Name: "foo_list.tmpl"}
    ```
    Set `Status:` explicitly on the View only when the endpoint returns something other than 200.
-3. Exactly one ancestor per leaf path calls `cmdutil.InjectClient(cmd, buildClient)` — Cobra runs the closest `PersistentPreRunE` only, so additional calls on intermediate parents are dead. Put it on the domain root when all leaves share one client (`network`, `system`); put it on each sub-group parent when only some sub-trees need it (`docker`, `storage`). Leaf commands have no `client` parameter and call `cmdutil.Client[<Domain>Client](cmd).<Method>(...)` to retrieve it.
-4. Leaf commands render with `<view>.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)` — use `cmd.OutOrStdout()` for the writer outside `watch.Wrap`, and the `w` argument passed by `watch.Wrap` inside it.
+3. Exactly one ancestor per leaf path calls `cmdutil.InjectClient(cmd, buildClient)` where `buildClient` closes over `f` and calls `f.HTTPClient()` — Cobra runs the closest `PersistentPreRunE` only, so additional calls on intermediate parents are dead. Put it on the domain root when all leaves share one client (`network`, `system`); put it on each sub-group parent when only some sub-trees need it (`docker`, `storage`). Leaf commands have no `client` parameter and call `cmdutil.Client[<Domain>Client](cmd).<Method>(...)` to retrieve it.
+4. Leaf commands render with `<view>.Render(w, f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)` — use `cmd.OutOrStdout()` for the writer outside `watch.Wrap`, and the `w` argument passed by `watch.Wrap` inside it.
 5. List commands accepting a device filter use `device := cmdutil.DeviceFlag(cmd)`; dereference with `*device`.
 6. Start/stop/restart-style commands (204 No Content + success message) use `cmdutil.ActionCmd[<Domain>Client](use, short, pastTense, exec)`.
-7. Register the new domain in `internal/cli/root.go` via `rootCmd.AddCommand(<domain>.NewCmd())`.
-8. Tests construct leaves directly and seed the client via `cmdutil.SetClient[<Domain>Client](cmd, stub)`.
-9. For polymorphic responses (discriminated unions like `NetworkDeviceDetail`, `SystemUpdateDetail`), declare a `cmdutil.PolymorphicView[<UnionType>]` instead of a `View`. Its `Variants` map is keyed by the discriminator string returned by `T.Discriminator()`; each `Variant` binds a template name to a `Resolve func(T) (any, error)` that calls the appropriate `As<Variant>()` accessor (and optionally transforms the result). Render with `view.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)` — same call shape as `View.Render`. When a variant resolver depends on per-call state (e.g. a flag), construct the `PolymorphicView` inside `RunE` so the resolver can close over it.
-10. When template data must be derived from the response body (e.g. row structs with formatted bytes/uptime), use `view.RenderWith(w, resp.StatusCode(), resp.Body, fn)` instead of `view.Render`. `fn` is invoked only in table mode, so derivation work is skipped when `--output=json`.
+7. Register the new domain in `internal/cli/root.go` by adding `<domain>.NewCmd(f)` to the `root.AddCommand(...)` call inside `NewRootCmd(f)`.
+8. Tests construct leaves directly using `cmdutil.TestFactory(t)` and seed the client via `cmdutil.SetClient[<Domain>Client](cmd, stub)`.
+9. For polymorphic responses (discriminated unions like `NetworkDeviceDetail`, `SystemUpdateDetail`), declare a `cmdutil.PolymorphicView[<UnionType>]` instead of a `View`. Its `Variants` map is keyed by the discriminator string returned by `T.Discriminator()`; each `Variant` binds a template name to a `Resolve func(T) (any, error)` that calls the appropriate `As<Variant>()` accessor (and optionally transforms the result). Render with `view.Render(w, f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)` — same call shape as `View.Render`. When a variant resolver depends on per-call state (e.g. a flag), construct the `PolymorphicView` inside `RunE` so the resolver can close over it.
+10. When template data must be derived from the response body (e.g. row structs with formatted bytes/uptime), use `view.RenderWith(w, f.Output(), resp.StatusCode(), resp.Body, fn)` instead of `view.Render`. `fn` is invoked only in table mode, so derivation work is skipped when `--output=json`.
 
 ## Adding a New oapi-codegen Domain
 
-1. Create `oapi-codegen-<domain>.yaml` with `generate: client: true, models: true`
+1. Create `codegen/<domain>.yaml` with `generate: client: true, models: true`; set `output:` to `internal/api/<domain>/api.gen.go`
 2. Add the generation line to the `Makefile` `generate` target
 3. Run `make generate`
 

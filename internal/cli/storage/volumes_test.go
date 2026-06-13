@@ -8,34 +8,34 @@ import (
 	"strings"
 	"testing"
 
+	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/storage"
 )
 
-func okVolumesResp(list gen.VolumeList) *gen.ListStorageVolumesResponse {
+func okVolumesResp(list storageapi.VolumeList) *storageapi.ListStorageVolumesResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListStorageVolumesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &storageapi.ListStorageVolumesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func errVolumesResp(status int, body map[string]any) *gen.ListStorageVolumesResponse {
+func errVolumesResp(status int, body map[string]any) *storageapi.ListStorageVolumesResponse {
 	b, _ := json.Marshal(body)
-	return &gen.ListStorageVolumesResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &storageapi.ListStorageVolumesResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
-func okVolumeResp(data gen.VolumeDetail) *gen.GetStorageVolumeResponse {
+func okVolumeResp(data storageapi.VolumeDetail) *storageapi.GetStorageVolumeResponse {
 	b, _ := json.Marshal(data)
-	return &gen.GetStorageVolumeResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
+	return &storageapi.GetStorageVolumeResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
 }
 
 func TestListVolumesCmd_tableOutput(t *testing.T) {
-	list := gen.VolumeList{
-		Items: []gen.Volume{
+	list := storageapi.VolumeList{
+		Items: []storageapi.Volume{
 			{
 				Id:         "nas-1.volume1",
 				Name:       "volume1",
 				Device:     "nas-1",
 				RaidType:   "SHR-2",
-				Status:     gen.Normal,
+				Status:     storageapi.Normal,
 				TotalBytes: 15_981_977_067_520,
 				UsedBytes:  10_132_536_762_777,
 				FileSystem: "ext4",
@@ -43,12 +43,12 @@ func TestListVolumesCmd_tableOutput(t *testing.T) {
 		},
 	}
 	stub := &StubClient{
-		ListStorageVolumesWithResponseFunc: func(_ context.Context, _ *gen.ListStorageVolumesParams, _ ...gen.RequestEditorFn) (*gen.ListStorageVolumesResponse, error) {
+		ListStorageVolumesWithResponseFunc: func(_ context.Context, _ *storageapi.ListStorageVolumesParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListStorageVolumesResponse, error) {
 			return okVolumesResp(list), nil
 		},
 	}
 
-	cmd := newListVolumesCmd()
+	cmd := newListVolumesCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -67,7 +67,7 @@ func TestListVolumesCmd_tableOutput(t *testing.T) {
 
 func TestListVolumesCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListStorageVolumesWithResponseFunc: func(_ context.Context, _ *gen.ListStorageVolumesParams, _ ...gen.RequestEditorFn) (*gen.ListStorageVolumesResponse, error) {
+		ListStorageVolumesWithResponseFunc: func(_ context.Context, _ *storageapi.ListStorageVolumesParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListStorageVolumesResponse, error) {
 			return errVolumesResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
@@ -76,7 +76,7 @@ func TestListVolumesCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListVolumesCmd()
+	cmd := newListVolumesCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -91,25 +91,25 @@ func TestListVolumesCmd_apiError(t *testing.T) {
 }
 
 func TestGetVolumeCmd_tableOutput(t *testing.T) {
-	detail := gen.VolumeDetail{
+	detail := storageapi.VolumeDetail{
 		Id:         "nas-1.volume1",
 		Name:       "volume1",
 		Device:     "nas-1",
 		RaidType:   "SHR-2",
-		Status:     gen.Normal,
-		PoolStatus: gen.Normal,
+		Status:     storageapi.Normal,
+		PoolStatus: storageapi.Normal,
 		MountPath:  "/volume1",
 		FileSystem: "ext4",
 		TotalBytes: 15_981_977_067_520,
 		UsedBytes:  10_132_536_762_777,
 	}
 	stub := &StubClient{
-		GetStorageVolumeWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetStorageVolumeResponse, error) {
+		GetStorageVolumeWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetStorageVolumeResponse, error) {
 			return okVolumeResp(detail), nil
 		},
 	}
 
-	cmd := newGetVolumeCmd()
+	cmd := newGetVolumeCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[StorageClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.volume1"})
 	buf := &bytes.Buffer{}

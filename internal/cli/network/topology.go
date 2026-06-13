@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	gen "github.com/bwilczynski/hlctl/internal/network"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +26,7 @@ type topologyEdge struct {
 	EdgeDisp string
 }
 
-func newTopologyCmd() *cobra.Command {
+func newTopologyCmd(f *cmdutil.Factory) *cobra.Command {
 	var includeClients bool
 	var includeWireless bool
 
@@ -34,8 +34,8 @@ func newTopologyCmd() *cobra.Command {
 		Use:   "topology",
 		Short: "Show network topology",
 	}
-	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		params := &gen.GetNetworkTopologyParams{}
+	cmd.RunE = watch.Wrap(f.Output, func(ctx context.Context, w io.Writer) error {
+		params := &networkapi.GetNetworkTopologyParams{}
 		if includeClients || includeWireless {
 			t := true
 			params.IncludeClients = &t
@@ -45,7 +45,7 @@ func newTopologyCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return topologyView.RenderWith(w, resp.StatusCode(), resp.Body, func() (any, error) {
+		return topologyView.RenderWith(w, f.Output(), resp.StatusCode(), resp.Body, func() (any, error) {
 			return buildTopologyTree(*resp.JSON200, includeWireless)
 		})
 	})
@@ -56,7 +56,7 @@ func newTopologyCmd() *cobra.Command {
 	return cmd
 }
 
-func buildTopologyTree(topo gen.NetworkTopology, includeWireless bool) (topologyTree, error) {
+func buildTopologyTree(topo networkapi.NetworkTopology, includeWireless bool) (topologyTree, error) {
 	nodeDisp := make(map[string]string)
 	var gatewayID string
 
@@ -76,7 +76,7 @@ func buildTopologyTree(topo gen.NetworkTopology, includeWireless bool) (topology
 				disp += fmt.Sprintf(" [%d clients]", *d.NumClients)
 			}
 			nodeDisp[d.Id] = disp
-			if d.Type == gen.NetworkDeviceTypeGateway {
+			if d.Type == networkapi.NetworkDeviceTypeGateway {
 				gatewayID = d.Id
 			}
 		case "client":
@@ -147,7 +147,7 @@ func buildTopologyTree(topo gen.NetworkTopology, includeWireless bool) (topology
 	}, nil
 }
 
-func connectionRefID(ref gen.NetworkConnectionRef) (string, error) {
+func connectionRefID(ref networkapi.NetworkConnectionRef) (string, error) {
 	disc, err := ref.Discriminator()
 	if err != nil {
 		return "", err

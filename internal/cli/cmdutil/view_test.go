@@ -9,7 +9,7 @@ import (
 	"testing/fstest"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
 func fakeTemplates() fstest.MapFS {
@@ -21,12 +21,9 @@ func fakeTemplates() fstest.MapFS {
 type greet struct{ Name string }
 
 func TestView_Render_table(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
 	var buf bytes.Buffer
-	if err := v.Render(&buf, http.StatusOK, []byte(`{"name":"world"}`), greet{Name: "world"}); err != nil {
+	if err := v.Render(&buf, output.FormatTable, http.StatusOK, []byte(`{"name":"world"}`), greet{Name: "world"}); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 	if got := buf.String(); got != "hello world\n" {
@@ -35,13 +32,10 @@ func TestView_Render_table(t *testing.T) {
 }
 
 func TestView_Render_json(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "json"
-
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
 	var buf bytes.Buffer
 	body := []byte(`{"name":"world"}`)
-	if err := v.Render(&buf, http.StatusOK, body, greet{Name: "world"}); err != nil {
+	if err := v.Render(&buf, output.FormatJSON, http.StatusOK, body, greet{Name: "world"}); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 	if buf.String() != string(body) {
@@ -52,7 +46,7 @@ func TestView_Render_json(t *testing.T) {
 func TestView_Render_statusMismatch_returnsParseError(t *testing.T) {
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
 	body := []byte(`{"title":"Not Found","detail":"missing"}`)
-	err := v.Render(&bytes.Buffer{}, http.StatusNotFound, body, nil)
+	err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusNotFound, body, nil)
 	if err == nil {
 		t.Fatal("expected error for non-OK status")
 	}
@@ -62,12 +56,9 @@ func TestView_Render_statusMismatch_returnsParseError(t *testing.T) {
 }
 
 func TestView_Render_customStatus(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl", Status: http.StatusCreated}
 	var buf bytes.Buffer
-	if err := v.Render(&buf, http.StatusCreated, []byte(`{"name":"new"}`), greet{Name: "new"}); err != nil {
+	if err := v.Render(&buf, output.FormatTable, http.StatusCreated, []byte(`{"name":"new"}`), greet{Name: "new"}); err != nil {
 		t.Fatalf("Render: %v", err)
 	}
 	if got := buf.String(); got != "hello new\n" {
@@ -75,20 +66,17 @@ func TestView_Render_customStatus(t *testing.T) {
 	}
 
 	// 200 should now be treated as a mismatch.
-	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{"title":"oops"}`), nil)
+	err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{"title":"oops"}`), nil)
 	if err == nil {
 		t.Fatal("expected error when status differs from configured Status")
 	}
 }
 
 func TestView_RenderWith_tableInvokesFn(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	called := 0
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
 	var buf bytes.Buffer
-	err := v.RenderWith(&buf, http.StatusOK, []byte(`{"name":"world"}`), func() (any, error) {
+	err := v.RenderWith(&buf, output.FormatTable, http.StatusOK, []byte(`{"name":"world"}`), func() (any, error) {
 		called++
 		return greet{Name: "world"}, nil
 	})
@@ -104,14 +92,11 @@ func TestView_RenderWith_tableInvokesFn(t *testing.T) {
 }
 
 func TestView_RenderWith_jsonSkipsFn(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "json"
-
 	called := 0
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
 	var buf bytes.Buffer
 	body := []byte(`{"name":"world"}`)
-	err := v.RenderWith(&buf, http.StatusOK, body, func() (any, error) {
+	err := v.RenderWith(&buf, output.FormatJSON, http.StatusOK, body, func() (any, error) {
 		called++
 		return nil, nil
 	})
@@ -129,7 +114,7 @@ func TestView_RenderWith_jsonSkipsFn(t *testing.T) {
 func TestView_RenderWith_statusMismatchSkipsFn(t *testing.T) {
 	called := 0
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
-	err := v.RenderWith(&bytes.Buffer{}, http.StatusNotFound, []byte(`{"title":"Not Found"}`), func() (any, error) {
+	err := v.RenderWith(&bytes.Buffer{}, output.FormatTable, http.StatusNotFound, []byte(`{"title":"Not Found"}`), func() (any, error) {
 		called++
 		return nil, nil
 	})
@@ -145,12 +130,9 @@ func TestView_RenderWith_statusMismatchSkipsFn(t *testing.T) {
 }
 
 func TestView_RenderWith_fnErrorPropagates(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
 	wantErr := errors.New("boom")
-	err := v.RenderWith(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), func() (any, error) {
+	err := v.RenderWith(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{}`), func() (any, error) {
 		return nil, wantErr
 	})
 	if !errors.Is(err, wantErr) {
@@ -159,12 +141,9 @@ func TestView_RenderWith_fnErrorPropagates(t *testing.T) {
 }
 
 func TestView_RenderWith_customStatus(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl", Status: http.StatusCreated}
 	var buf bytes.Buffer
-	err := v.RenderWith(&buf, http.StatusCreated, []byte(`{"name":"new"}`), func() (any, error) {
+	err := v.RenderWith(&buf, output.FormatTable, http.StatusCreated, []byte(`{"name":"new"}`), func() (any, error) {
 		return greet{Name: "new"}, nil
 	})
 	if err != nil {
@@ -176,7 +155,7 @@ func TestView_RenderWith_customStatus(t *testing.T) {
 
 	// 200 should now be treated as a mismatch.
 	called := 0
-	err = v.RenderWith(&bytes.Buffer{}, http.StatusOK, []byte(`{"title":"oops"}`), func() (any, error) {
+	err = v.RenderWith(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{"title":"oops"}`), func() (any, error) {
 		called++
 		return nil, nil
 	})
@@ -218,13 +197,10 @@ func newPolyView() cmdutil.PolymorphicView[fakeUnion] {
 }
 
 func TestPolymorphicView_dispatchesToVariant(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := newPolyView()
 
 	var bufA bytes.Buffer
-	if err := v.Render(&bufA, http.StatusOK, []byte(`{"kind":"a"}`), &fakeUnion{Kind: "a", Data: "alpha"}); err != nil {
+	if err := v.Render(&bufA, output.FormatTable, http.StatusOK, []byte(`{"kind":"a"}`), &fakeUnion{Kind: "a", Data: "alpha"}); err != nil {
 		t.Fatalf("Render a: %v", err)
 	}
 	if got := bufA.String(); got != "A: alpha\n" {
@@ -232,7 +208,7 @@ func TestPolymorphicView_dispatchesToVariant(t *testing.T) {
 	}
 
 	var bufB bytes.Buffer
-	if err := v.Render(&bufB, http.StatusOK, []byte(`{"kind":"b"}`), &fakeUnion{Kind: "b", Data: "beta"}); err != nil {
+	if err := v.Render(&bufB, output.FormatTable, http.StatusOK, []byte(`{"kind":"b"}`), &fakeUnion{Kind: "b", Data: "beta"}); err != nil {
 		t.Fatalf("Render b: %v", err)
 	}
 	if got := bufB.String(); got != "B: beta\n" {
@@ -241,14 +217,11 @@ func TestPolymorphicView_dispatchesToVariant(t *testing.T) {
 }
 
 func TestPolymorphicView_jsonModeSkipsDiscriminator(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "json"
-
 	v := newPolyView()
 	body := []byte(`{"kind":"a","data":"alpha"}`)
 	var buf bytes.Buffer
 	// Kind is empty — would error out of Discriminator() if called.
-	if err := v.Render(&buf, http.StatusOK, body, &fakeUnion{}); err != nil {
+	if err := v.Render(&buf, output.FormatJSON, http.StatusOK, body, &fakeUnion{}); err != nil {
 		t.Fatalf("Render json: %v", err)
 	}
 	if buf.String() != string(body) {
@@ -258,7 +231,7 @@ func TestPolymorphicView_jsonModeSkipsDiscriminator(t *testing.T) {
 
 func TestPolymorphicView_statusMismatch(t *testing.T) {
 	v := newPolyView()
-	err := v.Render(&bytes.Buffer{}, http.StatusNotFound, []byte(`{"title":"Not Found"}`), &fakeUnion{Kind: "a"})
+	err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusNotFound, []byte(`{"title":"Not Found"}`), &fakeUnion{Kind: "a"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -268,14 +241,11 @@ func TestPolymorphicView_statusMismatch(t *testing.T) {
 }
 
 func TestPolymorphicView_customStatus(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := newPolyView()
 	v.Status = http.StatusCreated
 
 	var buf bytes.Buffer
-	if err := v.Render(&buf, http.StatusCreated, []byte(`{}`), &fakeUnion{Kind: "a", Data: "alpha"}); err != nil {
+	if err := v.Render(&buf, output.FormatTable, http.StatusCreated, []byte(`{}`), &fakeUnion{Kind: "a", Data: "alpha"}); err != nil {
 		t.Fatalf("Render 201: %v", err)
 	}
 	if got := buf.String(); got != "A: alpha\n" {
@@ -283,17 +253,14 @@ func TestPolymorphicView_customStatus(t *testing.T) {
 	}
 
 	// 200 should now be treated as a mismatch.
-	if err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{"title":"oops"}`), &fakeUnion{Kind: "a"}); err == nil {
+	if err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{"title":"oops"}`), &fakeUnion{Kind: "a"}); err == nil {
 		t.Fatal("expected mismatch error when status differs from configured Status")
 	}
 }
 
 func TestPolymorphicView_unknownDiscriminator(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := newPolyView()
-	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: "c"})
+	err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: "c"})
 	if err == nil {
 		t.Fatal("expected error for unknown discriminator")
 	}
@@ -303,20 +270,14 @@ func TestPolymorphicView_unknownDiscriminator(t *testing.T) {
 }
 
 func TestPolymorphicView_nilDetail(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := newPolyView()
-	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), (*fakeUnion)(nil))
+	err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{}`), (*fakeUnion)(nil))
 	if err == nil {
 		t.Fatal("expected error for nil detail")
 	}
 }
 
 func TestPolymorphicView_resolveError(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	wantErr := errors.New("resolve boom")
 	v := cmdutil.PolymorphicView[fakeUnion]{
 		Templates: polyTemplates(),
@@ -324,18 +285,15 @@ func TestPolymorphicView_resolveError(t *testing.T) {
 			"a": {Template: "a.tmpl", Resolve: func(u fakeUnion) (any, error) { return nil, wantErr }},
 		},
 	}
-	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: "a"})
+	err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: "a"})
 	if !errors.Is(err, wantErr) {
 		t.Errorf("expected resolve error to propagate, got %v", err)
 	}
 }
 
 func TestPolymorphicView_discriminatorError(t *testing.T) {
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "table"
-
 	v := newPolyView()
-	err := v.Render(&bytes.Buffer{}, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: ""})
+	err := v.Render(&bytes.Buffer{}, output.FormatTable, http.StatusOK, []byte(`{}`), &fakeUnion{Kind: ""})
 	if err == nil {
 		t.Fatal("expected error for empty discriminator")
 	}

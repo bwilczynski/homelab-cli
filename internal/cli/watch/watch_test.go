@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -38,9 +38,10 @@ func TestWrap_watchDisabled_callsOnce(t *testing.T) {
 		return nil
 	}
 
+	getTable := func() output.Format { return output.FormatTable }
 	cmd := &cobra.Command{Use: "test"}
 	RegisterFlags(cmd)
-	cmd.RunE = Wrap(fn)
+	cmd.RunE = Wrap(getTable, fn)
 
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -71,11 +72,12 @@ func TestWrap_nonTTY_appendsSnapshots(t *testing.T) {
 		return nil
 	}
 
+	getTable := func() output.Format { return output.FormatTable }
 	root := &cobra.Command{Use: "hlctl"}
 	cmd := &cobra.Command{Use: "test"}
 	root.AddCommand(cmd)
 	RegisterFlags(cmd)
-	cmd.RunE = Wrap(fn)
+	cmd.RunE = Wrap(getTable, fn)
 	root.SetContext(ctx)
 	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
 
@@ -102,9 +104,7 @@ func TestWrap_nonTTY_appendsSnapshots(t *testing.T) {
 }
 
 func TestWrap_jsonMode_emitsNDJSON(t *testing.T) {
-	prev := flags.OutputFormat
-	flags.OutputFormat = "json"
-	t.Cleanup(func() { flags.OutputFormat = prev })
+	getJSON := func() output.Format { return output.FormatJSON }
 
 	var calls atomic.Int32
 	ctx, cancel := context.WithCancel(context.Background())
@@ -123,7 +123,7 @@ func TestWrap_jsonMode_emitsNDJSON(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	root.AddCommand(cmd)
 	RegisterFlags(cmd)
-	cmd.RunE = Wrap(fn)
+	cmd.RunE = Wrap(getJSON, fn)
 	root.SetContext(ctx)
 	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
 
@@ -153,9 +153,7 @@ func TestWrap_jsonMode_emitsNDJSON(t *testing.T) {
 }
 
 func TestWrap_jsonMode_errorIsValidJSON(t *testing.T) {
-	prev := flags.OutputFormat
-	flags.OutputFormat = "json"
-	t.Cleanup(func() { flags.OutputFormat = prev })
+	getJSON := func() output.Format { return output.FormatJSON }
 
 	var calls atomic.Int32
 	ctx, cancel := context.WithCancel(context.Background())
@@ -174,7 +172,7 @@ func TestWrap_jsonMode_errorIsValidJSON(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	root.AddCommand(cmd)
 	RegisterFlags(cmd)
-	cmd.RunE = Wrap(fn)
+	cmd.RunE = Wrap(getJSON, fn)
 	root.SetContext(ctx)
 	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
 
@@ -200,9 +198,10 @@ func TestWrap_jsonMode_errorIsValidJSON(t *testing.T) {
 
 func TestWrap_intervalBelowMinimum_returnsError(t *testing.T) {
 	fn := func(_ context.Context, _ io.Writer) error { return nil }
+	getTable := func() output.Format { return output.FormatTable }
 	cmd := &cobra.Command{Use: "test"}
 	RegisterFlags(cmd)
-	cmd.RunE = Wrap(fn)
+	cmd.RunE = Wrap(getTable, fn)
 	cmd.SetArgs([]string{"--watch", "--watch-interval=10ms"})
 
 	buf := &bytes.Buffer{}
@@ -237,11 +236,12 @@ func TestWrap_nonTTY_tickError_continues(t *testing.T) {
 		return nil
 	}
 
+	getTable := func() output.Format { return output.FormatTable }
 	root := &cobra.Command{Use: "hlctl"}
 	cmd := &cobra.Command{Use: "test"}
 	root.AddCommand(cmd)
 	RegisterFlags(cmd)
-	cmd.RunE = Wrap(fn)
+	cmd.RunE = Wrap(getTable, fn)
 	root.SetContext(ctx)
 	root.SetArgs([]string{"test", "--watch", "--watch-interval=100ms"})
 

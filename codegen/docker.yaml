@@ -1,8 +1,8 @@
-package: storage
+package: docker
 generate:
   client: true
   models: true
-output: internal/storage/api.gen.go
+output: internal/api/docker/api.gen.go
 output-options:
   include-tags:
-    - storage
+    - docker

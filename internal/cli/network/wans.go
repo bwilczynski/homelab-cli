@@ -10,16 +10,16 @@ var (
 	wansGetView  = cmdutil.View{Templates: networkTemplates, Name: "wans_get.tmpl"}
 )
 
-func newWansCmd() *cobra.Command {
+func newWansCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wans",
 		Short: "WAN interfaces",
 	}
-	cmd.AddCommand(newListWansCmd(), newGetWanCmd())
+	cmd.AddCommand(newListWansCmd(f), newGetWanCmd(f))
 	return cmd
 }
 
-func newListWansCmd() *cobra.Command {
+func newListWansCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List WAN interfaces",
@@ -28,12 +28,12 @@ func newListWansCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return wansListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return wansListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
 
-func newGetWanCmd() *cobra.Command {
+func newGetWanCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <wan-id>",
 		Short: "Show WAN interface details",
@@ -43,7 +43,7 @@ func newGetWanCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return wansGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return wansGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

@@ -5,36 +5,32 @@ import (
 	"fmt"
 
 	authpkg "github.com/bwilczynski/hlctl/internal/auth"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	"github.com/bwilczynski/hlctl/internal/config"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "Authenticate with the Homelab API",
 	}
-	cmd.AddCommand(newLoginCmd())
+	cmd.AddCommand(newLoginCmd(f))
 	cmd.AddCommand(newLogoutCmd())
 	return cmd
 }
 
-func newLoginCmd() *cobra.Command {
+func newLoginCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "login",
 		Short: "Log in via device authorization flow",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
+			cfg, err := f.Config()
 			if err != nil {
 				return err
 			}
-			apiURL := flags.GetAPIURL()
-			if apiURL == "" {
-				apiURL, err = cfg.ResolveAPIURL()
-				if err != nil {
-					return err
-				}
+			apiURL, err := f.APIURL()
+			if err != nil {
+				return err
 			}
 
 			info, err := authpkg.DiscoverHomelab(apiURL)

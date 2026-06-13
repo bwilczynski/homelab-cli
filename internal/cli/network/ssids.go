@@ -10,16 +10,16 @@ var (
 	ssidsGetView  = cmdutil.View{Templates: networkTemplates, Name: "ssids_get.tmpl"}
 )
 
-func newSsidsCmd() *cobra.Command {
+func newSsidsCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ssids",
 		Short: "WiFi networks (SSIDs)",
 	}
-	cmd.AddCommand(newListSsidsCmd(), newGetSsidCmd())
+	cmd.AddCommand(newListSsidsCmd(f), newGetSsidCmd(f))
 	return cmd
 }
 
-func newListSsidsCmd() *cobra.Command {
+func newListSsidsCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List WiFi networks",
@@ -28,12 +28,12 @@ func newListSsidsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return ssidsListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return ssidsListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
 
-func newGetSsidCmd() *cobra.Command {
+func newGetSsidCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <ssid-id>",
 		Short: "Show WiFi network details",
@@ -43,7 +43,7 @@ func newGetSsidCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return ssidsGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return ssidsGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

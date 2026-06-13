@@ -17,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -36,8 +35,8 @@ const (
 // TickFunc is the per-tick body executed by the watch loop. It writes its
 // rendered output to w and uses ctx for any cancellable work (e.g. HTTP calls).
 //
-// In JSON output mode (flags.GetOutputFormat() == output.FormatJSON), fn must
-// write exactly one compact JSON document with no trailing newline; the loop
+// In JSON output mode (getOutputFmt() == output.FormatJSON), fn must write
+// exactly one compact JSON document with no trailing newline; the loop
 // appends the NDJSON newline separator. Do NOT call output.Print in JSON mode
 // — it pretty-prints with indentation, which breaks NDJSON.
 type TickFunc func(ctx context.Context, w io.Writer) error
@@ -51,7 +50,10 @@ func RegisterFlags(cmd *cobra.Command) {
 // Wrap returns a cobra RunE. When --watch is false, it calls fn once with
 // cmd.OutOrStdout(). When --watch is true, it runs fn on an interval until
 // the context is cancelled by SIGINT/SIGTERM.
-func Wrap(fn TickFunc) func(cmd *cobra.Command, args []string) error {
+//
+// getOutputFmt is a closure returning the current --output flag value, read
+// per invocation so that flag parsing has already completed.
+func Wrap(getOutputFmt func() output.Format, fn TickFunc) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		watching, _ := cmd.Flags().GetBool("watch")
 		if !watching {
@@ -61,17 +63,17 @@ func Wrap(fn TickFunc) func(cmd *cobra.Command, args []string) error {
 		if interval < minInterval {
 			return fmt.Errorf("--watch-interval must be at least %s", minInterval)
 		}
-		return loop(cmd, interval, fn)
+		return loop(cmd, interval, getOutputFmt, fn)
 	}
 }
 
-func loop(cmd *cobra.Command, interval time.Duration, fn TickFunc) error {
+func loop(cmd *cobra.Command, interval time.Duration, getOutputFmt func() output.Format, fn TickFunc) error {
 	w := cmd.OutOrStdout()
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	tty := isTerminal(w)
-	jsonMode := flags.GetOutputFormat() == output.FormatJSON
+	jsonMode := getOutputFmt() == output.FormatJSON
 
 	if tty && !jsonMode {
 		// One-time wipe of whatever the terminal had before the loop started;

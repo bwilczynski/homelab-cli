@@ -1,20 +1,12 @@
 package storage
 
 import (
-	"github.com/bwilczynski/hlctl/internal/apiclient"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{Use: "storage", Short: "NAS storage resources"}
-	cmd.AddCommand(newVolumesCmd(), newBackupsCmd())
+	cmd.AddCommand(newVolumesCmd(f), newBackupsCmd(f))
 	return cmd
-}
-
-func buildClient() (StorageClient, error) {
-	httpClient, apiURL, err := apiclient.NewHTTPClient()
-	if err != nil {
-		return nil, err
-	}
-	return NewStorageClient(httpClient, apiURL)
 }

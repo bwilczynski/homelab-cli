@@ -4,22 +4,21 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
-func TestExecute_version(t *testing.T) {
-	buf := &bytes.Buffer{}
-	rootCmd.SetOut(buf)
-	rootCmd.SetArgs([]string{"--version"})
-	prevVersion := rootCmd.Version
-	t.Cleanup(func() {
-		rootCmd.SetArgs(nil)
-		rootCmd.Version = prevVersion
-	})
+func TestNewRootCmd_version(t *testing.T) {
+	var buf bytes.Buffer
+	f := cmdutil.TestFactory(t)
+	f.Version = "v20260508.774a"
+	f.IOStreams.Out = &buf
 
-	if err := Execute("v20260508.774a"); err != nil {
+	root := NewRootCmd(f)
+	root.SetArgs([]string{"--version"})
+	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute returned unexpected error: %v", err)
 	}
-
 	if !strings.Contains(buf.String(), "v20260508.774a") {
 		t.Errorf("expected version in output, got: %s", buf.String())
 	}

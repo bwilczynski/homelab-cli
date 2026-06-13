@@ -11,6 +11,7 @@ import (
 
 	authpkg "github.com/bwilczynski/hlctl/internal/auth"
 	authcli "github.com/bwilczynski/hlctl/internal/cli/auth"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func writeTempCredentials(t *testing.T) string {
@@ -41,7 +42,7 @@ func writeTempCredentials(t *testing.T) string {
 func TestLogoutCmd_deletesCredentials(t *testing.T) {
 	path := writeTempCredentials(t)
 
-	cmd := authcli.NewCmd()
+	cmd := authcli.NewCmd(cmdutil.TestFactory(t))
 	cmd.SetArgs([]string{"logout"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -61,7 +62,7 @@ func TestLogoutCmd_deletesCredentials(t *testing.T) {
 func TestLogoutCmd_noCredentials(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	cmd := authcli.NewCmd()
+	cmd := authcli.NewCmd(cmdutil.TestFactory(t))
 	cmd.SetArgs([]string{"logout"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)

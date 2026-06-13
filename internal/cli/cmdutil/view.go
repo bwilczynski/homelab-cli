@@ -6,8 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/bwilczynski/hlctl/internal/apiclient"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/api"
 	"github.com/bwilczynski/hlctl/internal/output"
 )
 
@@ -27,15 +26,15 @@ type View struct {
 // renderHead handles the status check and JSON shortcut shared by every
 // render path. Returns handled=true when the JSON body has been written and
 // the caller should return nil; returns a non-nil error on status mismatch.
-func renderHead(w io.Writer, expectedStatus, statusCode int, body []byte) (handled bool, err error) {
+func renderHead(w io.Writer, outputFmt output.Format, expectedStatus, statusCode int, body []byte) (handled bool, err error) {
 	expected := expectedStatus
 	if expected == 0 {
 		expected = http.StatusOK
 	}
 	if statusCode != expected {
-		return false, apiclient.ParseError(statusCode, body)
+		return false, api.ParseError(statusCode, body)
 	}
-	if flags.GetOutputFormat() == output.FormatJSON {
+	if outputFmt == output.FormatJSON {
 		fmt.Fprint(w, string(body))
 		return true, nil
 	}
@@ -43,11 +42,11 @@ func renderHead(w io.Writer, expectedStatus, statusCode int, body []byte) (handl
 }
 
 // Render handles the standard response→output flow:
-//   - status != v.Status (or 200 if unset) → apiclient.ParseError
-//   - --output=json → write raw body
+//   - status != v.Status (or 200 if unset) → api.ParseError
+//   - outputFmt == FormatJSON → write raw body
 //   - otherwise → render the bound template against data
-func (v View) Render(w io.Writer, statusCode int, body []byte, data any) error {
-	handled, err := renderHead(w, v.Status, statusCode, body)
+func (v View) Render(w io.Writer, outputFmt output.Format, statusCode int, body []byte, data any) error {
+	handled, err := renderHead(w, outputFmt, v.Status, statusCode, body)
 	if handled || err != nil {
 		return err
 	}
@@ -55,11 +54,9 @@ func (v View) Render(w io.Writer, statusCode int, body []byte, data any) error {
 }
 
 // RenderWith mirrors Render but defers data construction. fn is invoked only
-// in table mode — JSON mode dumps the raw body without running fn. Use this
-// when the template data needs to be derived from the response body and the
-// derivation work would be wasted in JSON mode.
-func (v View) RenderWith(w io.Writer, statusCode int, body []byte, fn func() (any, error)) error {
-	handled, err := renderHead(w, v.Status, statusCode, body)
+// in table mode — JSON mode dumps the raw body without running fn.
+func (v View) RenderWith(w io.Writer, outputFmt output.Format, statusCode int, body []byte, fn func() (any, error)) error {
+	handled, err := renderHead(w, outputFmt, v.Status, statusCode, body)
 	if handled || err != nil {
 		return err
 	}
@@ -95,8 +92,8 @@ type PolymorphicView[T Discriminator] struct {
 
 // Render handles the status check + JSON shortcut, then dispatches on
 // detail.Discriminator() to look up the variant template and resolved data.
-func (v PolymorphicView[T]) Render(w io.Writer, statusCode int, body []byte, detail *T) error {
-	handled, err := renderHead(w, v.Status, statusCode, body)
+func (v PolymorphicView[T]) Render(w io.Writer, outputFmt output.Format, statusCode int, body []byte, detail *T) error {
+	handled, err := renderHead(w, outputFmt, v.Status, statusCode, body)
 	if handled || err != nil {
 		return err
 	}

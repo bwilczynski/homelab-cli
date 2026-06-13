@@ -4,50 +4,50 @@ import (
 	"context"
 	"io"
 
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	gen "github.com/bwilczynski/hlctl/internal/network"
 	"github.com/spf13/cobra"
 )
 
 var (
 	clientsListView = cmdutil.View{Templates: networkTemplates, Name: "clients_list.tmpl"}
 
-	clientGetView = cmdutil.PolymorphicView[gen.NetworkClientDetail]{
+	clientGetView = cmdutil.PolymorphicView[networkapi.NetworkClientDetail]{
 		Templates: networkTemplates,
-		Variants: map[string]cmdutil.Variant[gen.NetworkClientDetail]{
+		Variants: map[string]cmdutil.Variant[networkapi.NetworkClientDetail]{
 			"wired": {
 				Template: "clients_get_wired.tmpl",
-				Resolve:  func(d gen.NetworkClientDetail) (any, error) { return d.AsWiredNetworkClientDetail() },
+				Resolve:  func(d networkapi.NetworkClientDetail) (any, error) { return d.AsWiredNetworkClientDetail() },
 			},
 			"wireless": {
 				Template: "clients_get_wireless.tmpl",
-				Resolve:  func(d gen.NetworkClientDetail) (any, error) { return d.AsWirelessNetworkClientDetail() },
+				Resolve:  func(d networkapi.NetworkClientDetail) (any, error) { return d.AsWirelessNetworkClientDetail() },
 			},
 		},
 	}
 )
 
-func newClientsCmd() *cobra.Command {
+func newClientsCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clients",
 		Short: "Network clients",
 	}
-	cmd.AddCommand(newListClientsCmd())
-	cmd.AddCommand(newGetClientCmd())
+	cmd.AddCommand(newListClientsCmd(f))
+	cmd.AddCommand(newGetClientCmd(f))
 	return cmd
 }
 
-func newListClientsCmd() *cobra.Command {
+func newListClientsCmd(f *cmdutil.Factory) *cobra.Command {
 	var statusFilter string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List network clients",
 	}
-	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		params := &gen.ListNetworkClientsParams{}
+	cmd.RunE = watch.Wrap(f.Output, func(ctx context.Context, w io.Writer) error {
+		params := &networkapi.ListNetworkClientsParams{}
 		if statusFilter != "" {
-			s := gen.NetworkClientStatus(statusFilter)
+			s := networkapi.NetworkClientStatus(statusFilter)
 			params.Status = &s
 		}
 
@@ -55,14 +55,14 @@ func newListClientsCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return clientsListView.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)
+		return clientsListView.Render(w, f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 	})
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
 	watch.RegisterFlags(cmd)
 	return cmd
 }
 
-func newGetClientCmd() *cobra.Command {
+func newGetClientCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <client-id>",
 		Short: "Show network client details",
@@ -72,7 +72,7 @@ func newGetClientCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return clientGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return clientGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

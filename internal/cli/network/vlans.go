@@ -10,16 +10,16 @@ var (
 	vlansGetView  = cmdutil.View{Templates: networkTemplates, Name: "vlans_get.tmpl"}
 )
 
-func newVlansCmd() *cobra.Command {
+func newVlansCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vlans",
 		Short: "VLANs",
 	}
-	cmd.AddCommand(newListVlansCmd(), newGetVlanCmd())
+	cmd.AddCommand(newListVlansCmd(f), newGetVlanCmd(f))
 	return cmd
 }
 
-func newListVlansCmd() *cobra.Command {
+func newListVlansCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List VLANs",
@@ -28,12 +28,12 @@ func newListVlansCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return vlansListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return vlansListView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
 
-func newGetVlanCmd() *cobra.Command {
+func newGetVlanCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <vlan-id>",
 		Short: "Show VLAN details",
@@ -43,7 +43,7 @@ func newGetVlanCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return vlansGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return vlansGetView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

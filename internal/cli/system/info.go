@@ -1,9 +1,9 @@
 package system
 
 import (
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/output"
-	gen "github.com/bwilczynski/hlctl/internal/system"
 	"github.com/spf13/cobra"
 )
 
@@ -17,14 +17,14 @@ type infoRow struct {
 	Uptime   string
 }
 
-func newInfoCmd() *cobra.Command {
+func newInfoCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "Show device information",
 	}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		params := &gen.ListSystemInfoParams{}
+		params := &systemapi.ListSystemInfoParams{}
 		if *device != "" {
 			params.Device = device
 		}
@@ -33,7 +33,7 @@ func newInfoCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return infoView.RenderWith(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, func() (any, error) {
+		return infoView.RenderWith(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, func() (any, error) {
 			items := make([]infoRow, 0, len(resp.JSON200.Items))
 			for _, info := range resp.JSON200.Items {
 				items = append(items, infoRow{

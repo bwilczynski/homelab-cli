@@ -8,45 +8,45 @@ import (
 	"strings"
 	"testing"
 
+	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/docker"
 )
 
-func okContainersResp(list gen.ContainerList) *gen.ListContainersResponse {
+func okContainersResp(list dockerapi.ContainerList) *dockerapi.ListContainersResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListContainersResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &dockerapi.ListContainersResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func errContainersResp(status int, body map[string]any) *gen.ListContainersResponse {
+func errContainersResp(status int, body map[string]any) *dockerapi.ListContainersResponse {
 	b, _ := json.Marshal(body)
-	return &gen.ListContainersResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &dockerapi.ListContainersResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
-func okContainerResp(detail gen.ContainerDetail) *gen.GetContainerResponse {
+func okContainerResp(detail dockerapi.ContainerDetail) *dockerapi.GetContainerResponse {
 	b, _ := json.Marshal(detail)
-	return &gen.GetContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
+	return &dockerapi.GetContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
 }
 
-func noContentStartResp() *gen.StartContainerResponse {
-	return &gen.StartContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
+func noContentStartResp() *dockerapi.StartContainerResponse {
+	return &dockerapi.StartContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
 }
 
-func noContentStopResp() *gen.StopContainerResponse {
-	return &gen.StopContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
+func noContentStopResp() *dockerapi.StopContainerResponse {
+	return &dockerapi.StopContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
 }
 
-func noContentRestartResp() *gen.RestartContainerResponse {
-	return &gen.RestartContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
+func noContentRestartResp() *dockerapi.RestartContainerResponse {
+	return &dockerapi.RestartContainerResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
 }
 
 func TestListContainersCmd_tableOutput(t *testing.T) {
-	list := gen.ContainerList{
-		Items: []gen.Container{
+	list := dockerapi.ContainerList{
+		Items: []dockerapi.Container{
 			{
 				Id:     "nas-1.homeassistant",
 				Image:  "homeassistant/home-assistant:latest",
-				Status: gen.Running,
-				Resources: gen.ContainerResources{
+				Status: dockerapi.Running,
+				Resources: dockerapi.ContainerResources{
 					CpuPercent:  1.5,
 					MemoryBytes: 104857600,
 				},
@@ -54,12 +54,12 @@ func TestListContainersCmd_tableOutput(t *testing.T) {
 		},
 	}
 	stub := &StubClient{
-		ListContainersWithResponseFunc: func(_ context.Context, _ *gen.ListContainersParams, _ ...gen.RequestEditorFn) (*gen.ListContainersResponse, error) {
+		ListContainersWithResponseFunc: func(_ context.Context, _ *dockerapi.ListContainersParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.ListContainersResponse, error) {
 			return okContainersResp(list), nil
 		},
 	}
 
-	cmd := newListContainersCmd()
+	cmd := newListContainersCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -78,7 +78,7 @@ func TestListContainersCmd_tableOutput(t *testing.T) {
 
 func TestListContainersCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListContainersWithResponseFunc: func(_ context.Context, _ *gen.ListContainersParams, _ ...gen.RequestEditorFn) (*gen.ListContainersResponse, error) {
+		ListContainersWithResponseFunc: func(_ context.Context, _ *dockerapi.ListContainersParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.ListContainersResponse, error) {
 			return errContainersResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
@@ -87,7 +87,7 @@ func TestListContainersCmd_apiError(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newListContainersCmd()
+	cmd := newListContainersCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -102,26 +102,26 @@ func TestListContainersCmd_apiError(t *testing.T) {
 }
 
 func TestGetContainerCmd_tableOutput(t *testing.T) {
-	detail := gen.ContainerDetail{
+	detail := dockerapi.ContainerDetail{
 		Id:            "nas-1.homeassistant",
 		Name:          "homeassistant",
 		Device:        "nas-1",
-		Status:        gen.Running,
+		Status:        dockerapi.Running,
 		Image:         "homeassistant/home-assistant:latest",
-		RestartPolicy: gen.Always,
-		Resources: gen.ContainerResources{
+		RestartPolicy: dockerapi.Always,
+		Resources: dockerapi.ContainerResources{
 			CpuPercent:    1.5,
 			MemoryBytes:   104857600,
 			MemoryPercent: 5.0,
 		},
 	}
 	stub := &StubClient{
-		GetContainerWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetContainerResponse, error) {
+		GetContainerWithResponseFunc: func(_ context.Context, _ string, _ ...dockerapi.RequestEditorFn) (*dockerapi.GetContainerResponse, error) {
 			return okContainerResp(detail), nil
 		},
 	}
 
-	cmd := newGetContainerCmd()
+	cmd := newGetContainerCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[DockerClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
@@ -141,7 +141,7 @@ func TestGetContainerCmd_tableOutput(t *testing.T) {
 
 func TestStartContainerCmd(t *testing.T) {
 	stub := &StubClient{
-		StartContainerWithResponseFunc: func(_ context.Context, _ string, _ *gen.StartContainerParams, _ ...gen.RequestEditorFn) (*gen.StartContainerResponse, error) {
+		StartContainerWithResponseFunc: func(_ context.Context, _ string, _ *dockerapi.StartContainerParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.StartContainerResponse, error) {
 			return noContentStartResp(), nil
 		},
 	}
@@ -160,7 +160,7 @@ func TestStartContainerCmd(t *testing.T) {
 
 func TestStopContainerCmd(t *testing.T) {
 	stub := &StubClient{
-		StopContainerWithResponseFunc: func(_ context.Context, _ string, _ *gen.StopContainerParams, _ ...gen.RequestEditorFn) (*gen.StopContainerResponse, error) {
+		StopContainerWithResponseFunc: func(_ context.Context, _ string, _ *dockerapi.StopContainerParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.StopContainerResponse, error) {
 			return noContentStopResp(), nil
 		},
 	}
@@ -179,7 +179,7 @@ func TestStopContainerCmd(t *testing.T) {
 
 func TestRestartContainerCmd(t *testing.T) {
 	stub := &StubClient{
-		RestartContainerWithResponseFunc: func(_ context.Context, _ string, _ *gen.RestartContainerParams, _ ...gen.RequestEditorFn) (*gen.RestartContainerResponse, error) {
+		RestartContainerWithResponseFunc: func(_ context.Context, _ string, _ *dockerapi.RestartContainerParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.RestartContainerResponse, error) {
 			return noContentRestartResp(), nil
 		},
 	}

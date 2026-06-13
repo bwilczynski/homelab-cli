@@ -8,44 +8,45 @@ import (
 	"strings"
 	"testing"
 
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/network"
 )
 
-func okWansResp(list gen.WanList) *gen.ListWansResponse {
+func okWansResp(list networkapi.WanList) *networkapi.ListWansResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListWansResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &networkapi.ListWansResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func errWansResp(status int, body map[string]any) *gen.ListWansResponse {
+func errWansResp(status int, body map[string]any) *networkapi.ListWansResponse {
 	b, _ := json.Marshal(body)
-	return &gen.ListWansResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.ListWansResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
-func okWanResp(data map[string]any) *gen.GetWanResponse {
+func okWanResp(data map[string]any) *networkapi.GetWanResponse {
 	b, _ := json.Marshal(data)
-	var typed gen.WanDetail
+	var typed networkapi.WanDetail
 	_ = json.Unmarshal(b, &typed)
-	return &gen.GetWanResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+	return &networkapi.GetWanResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
 }
 
-func errWanResp(status int, body map[string]any) *gen.GetWanResponse {
+func errWanResp(status int, body map[string]any) *networkapi.GetWanResponse {
 	b, _ := json.Marshal(body)
-	return &gen.GetWanResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.GetWanResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
 func TestListWansCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListWansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListWansResponse, error) {
-			return okWansResp(gen.WanList{
-				Items: []gen.Wan{
-					{Id: "unifi.wan1", Name: "WAN 1", IpAddress: "203.0.113.42", Uptime: 86400, Status: gen.WanStatusConnected},
-					{Id: "unifi.wan2", Name: "WAN 2", IpAddress: "198.51.100.7", Uptime: 0, Status: gen.WanStatusFailover},
+		ListWansWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListWansResponse, error) {
+			return okWansResp(networkapi.WanList{
+				Items: []networkapi.Wan{
+					{Id: "unifi.wan1", Name: "WAN 1", IpAddress: "203.0.113.42", Uptime: 86400, Status: networkapi.WanStatusConnected},
+					{Id: "unifi.wan2", Name: "WAN 2", IpAddress: "198.51.100.7", Uptime: 0, Status: networkapi.WanStatusFailover},
 				},
 			}), nil
 		},
 	}
-	cmd := newListWansCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListWansCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -63,14 +64,15 @@ func TestListWansCmd_tableOutput(t *testing.T) {
 
 func TestListWansCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListWansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListWansResponse, error) {
+		ListWansWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListWansResponse, error) {
 			return errWansResp(http.StatusUnauthorized, map[string]any{
 				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
 				"status": 401, "detail": "Bearer token missing",
 			}), nil
 		},
 	}
-	cmd := newListWansCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newListWansCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -86,7 +88,7 @@ func TestListWansCmd_apiError(t *testing.T) {
 
 func TestGetWanCmd_connected(t *testing.T) {
 	stub := &StubClient{
-		GetWanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetWanResponse, error) {
+		GetWanWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetWanResponse, error) {
 			return okWanResp(map[string]any{
 				"id": "unifi.wan1", "uri": "/network/wans/unifi.wan1",
 				"name": "WAN 1", "ipAddress": "203.0.113.42",
@@ -95,7 +97,8 @@ func TestGetWanCmd_connected(t *testing.T) {
 			}), nil
 		},
 	}
-	cmd := newGetWanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetWanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.wan1"})
 	buf := &bytes.Buffer{}
@@ -114,14 +117,15 @@ func TestGetWanCmd_connected(t *testing.T) {
 
 func TestGetWanCmd_notFound(t *testing.T) {
 	stub := &StubClient{
-		GetWanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetWanResponse, error) {
+		GetWanWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetWanResponse, error) {
 			return errWanResp(http.StatusNotFound, map[string]any{
 				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
 				"status": 404, "detail": "wan not found",
 			}), nil
 		},
 	}
-	cmd := newGetWanCmd()
+	f := cmdutil.TestFactory(t)
+	cmd := newGetWanCmd(f)
 	cmdutil.SetClient[NetworkClient](cmd, stub)
 	cmd.SetArgs([]string{"unifi.nonexistent"})
 	buf := &bytes.Buffer{}
