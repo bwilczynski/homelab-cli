@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okBackupsResp(list storageapi.BackupTaskList) *storageapi.ListBackupsResponse {

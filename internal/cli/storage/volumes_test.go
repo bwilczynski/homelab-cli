@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okVolumesResp(list storageapi.VolumeList) *storageapi.ListStorageVolumesResponse {

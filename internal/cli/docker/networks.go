@@ -1,8 +1,9 @@
 package docker
 
 import (
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ func newListNetworksCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return networksListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return networksListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
@@ -42,7 +43,7 @@ func newGetNetworkCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return networksGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return networksGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }

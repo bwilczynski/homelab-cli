@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okInfoResp(list systemapi.SystemInfoList) *systemapi.ListSystemInfoResponse {

@@ -1,8 +1,9 @@
 package storage
 
 import (
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ func newListBackupsCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return backupsListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return backupsListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
@@ -42,7 +43,7 @@ func newGetBackupCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return backupsGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return backupsGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }

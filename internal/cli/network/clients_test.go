@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okClientsResp(list networkapi.NetworkClientList) *networkapi.ListNetworkClientsResponse {
@@ -131,7 +131,7 @@ func TestGetClientCmd_wired(t *testing.T) {
 				"connectionType": "wired", "status": "online",
 				"connectedTo": map[string]any{
 					"device": map[string]any{"kind": "device", "id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr", "name": "Switch Living Room"},
-					"port": 3, "linkSpeed": "gbe1",
+					"port":   3, "linkSpeed": "gbe1",
 				},
 				"uptime": 3600,
 			}), nil
@@ -166,7 +166,7 @@ func TestGetClientCmd_wireless(t *testing.T) {
 				"connectionType": "wireless", "status": "online",
 				"connectedTo": map[string]any{
 					"device": map[string]any{"kind": "device", "id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room", "name": "AP Living Room"},
-					"ssid": "HomeNet", "signalStrength": -65,
+					"ssid":   "HomeNet", "signalStrength": -65,
 				},
 				"uptime": 1800,
 			}), nil
@@ -236,7 +236,7 @@ func TestGetClientCmd_offline_wireless(t *testing.T) {
 				"connectionType": "wireless", "status": "offline",
 				"connectedTo": map[string]any{
 					"device": map[string]any{"kind": "device", "id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room", "name": "AP Living Room"},
-					"ssid": "HomeNet",
+					"ssid":   "HomeNet",
 				},
 			}), nil
 		},

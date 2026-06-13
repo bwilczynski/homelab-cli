@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okDevicesResp(list networkapi.NetworkDeviceList) *networkapi.ListNetworkDevicesResponse {
@@ -153,7 +153,7 @@ func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 				},
 				"uplink": map[string]any{
 					"device": map[string]any{"kind": "device", "id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr", "name": "Switch Living Room"},
-					"port": 8, "linkSpeed": "gbe1",
+					"port":   8, "linkSpeed": "gbe1",
 				},
 			}), nil
 		},
@@ -191,8 +191,8 @@ func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 					{
 						"number": 1, "state": "up", "linkSpeed": "gbe1", "poeMode": "auto",
 						"poePowerWatts": 8.5,
-						"traffic": map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(1200), "txBytesPerSec": int64(500)},
-						"connectedTo": map[string]any{"kind": "device", "id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room", "name": "AP Living Room"},
+						"traffic":       map[string]any{"rxBytesTotal": int64(0), "txBytesTotal": int64(0), "rxBytesPerSec": int64(1200), "txBytesPerSec": int64(500)},
+						"connectedTo":   map[string]any{"kind": "device", "id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room", "name": "AP Living Room"},
 					},
 					{
 						"number": 2, "state": "down", "poeMode": "off",

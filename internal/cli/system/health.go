@@ -2,6 +2,7 @@ package system
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +17,7 @@ func newHealthCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return healthView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return healthView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

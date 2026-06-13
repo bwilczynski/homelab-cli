@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okWansResp(list networkapi.WanList) *networkapi.ListWansResponse {

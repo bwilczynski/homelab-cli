@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okHealthResp(data systemapi.Health) *systemapi.GetSystemHealthResponse {

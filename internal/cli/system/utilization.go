@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,7 @@ func newUtilizationCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return utilizationView.RenderWith(w, resp.StatusCode(), resp.Body, func() (any, error) {
+		return utilizationView.RenderWith(w, flags.GetOutputFormat(), resp.StatusCode(), resp.Body, func() (any, error) {
 			items := make([]utilizationRow, 0, len(resp.JSON200.Items))
 			for _, u := range resp.JSON200.Items {
 				swapPct := 0

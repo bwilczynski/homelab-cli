@@ -1,8 +1,9 @@
 package storage
 
 import (
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ func newListVolumesCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return volumesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return volumesListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }
@@ -42,7 +43,7 @@ func newGetVolumeCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return volumesGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return volumesGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }

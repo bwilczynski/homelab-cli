@@ -4,9 +4,10 @@ import (
 	"context"
 	"io"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +35,7 @@ func newListContainersCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return containersListView.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)
+		return containersListView.Render(w, flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	})
 	watch.RegisterFlags(cmd)
 	return cmd
@@ -47,7 +48,7 @@ func newGetContainerCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return containersGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+		return containersGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	}
 	return cmd
 }

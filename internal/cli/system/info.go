@@ -1,9 +1,10 @@
 package system
 
 import (
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/output"
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +34,7 @@ func newInfoCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return infoView.RenderWith(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, func() (any, error) {
+		return infoView.RenderWith(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, func() (any, error) {
 			items := make([]infoRow, 0, len(resp.JSON200.Items))
 			for _, info := range resp.JSON200.Items {
 				items = append(items, infoRow{

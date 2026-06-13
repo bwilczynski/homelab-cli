@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 )
 
 func okTopologyResp(data map[string]any) *networkapi.GetNetworkTopologyResponse {

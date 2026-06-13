@@ -4,9 +4,10 @@ import (
 	"context"
 	"io"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +56,7 @@ func newListClientsCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return clientsListView.Render(w, resp.StatusCode(), resp.Body, resp.JSON200)
+		return clientsListView.Render(w, flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 	})
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (online|offline)")
 	watch.RegisterFlags(cmd)
@@ -72,7 +73,7 @@ func newGetClientCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return clientGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return clientGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

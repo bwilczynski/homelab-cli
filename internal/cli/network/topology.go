@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/cli/watch"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +46,7 @@ func newTopologyCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return topologyView.RenderWith(w, resp.StatusCode(), resp.Body, func() (any, error) {
+		return topologyView.RenderWith(w, flags.GetOutputFormat(), resp.StatusCode(), resp.Body, func() (any, error) {
 			return buildTopologyTree(*resp.JSON200, includeWireless)
 		})
 	})

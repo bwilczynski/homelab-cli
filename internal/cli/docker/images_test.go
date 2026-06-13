@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okImagesResp(list dockerapi.DockerImageList) *dockerapi.ListDockerImagesResponse {

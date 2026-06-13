@@ -1,8 +1,9 @@
 package system
 
 import (
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +50,7 @@ func newListUpdatesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return updatesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return updatesListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 
@@ -68,7 +69,7 @@ func newGetUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return updateGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return updateGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
@@ -82,7 +83,7 @@ func newCheckUpdatesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return updatesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return updatesListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

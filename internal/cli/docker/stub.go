@@ -10,11 +10,11 @@ import (
 // function field. Use in tests to inject controlled responses.
 // When a function field is nil the method panics — always set the field under test.
 type StubClient struct {
-	ListContainersWithResponseFunc    func(ctx context.Context, params *dockerapi.ListContainersParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.ListContainersResponse, error)
-	GetContainerWithResponseFunc      func(ctx context.Context, containerId string, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.GetContainerResponse, error)
-	StartContainerWithResponseFunc    func(ctx context.Context, containerId string, params *dockerapi.StartContainerParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.StartContainerResponse, error)
-	StopContainerWithResponseFunc     func(ctx context.Context, containerId string, params *dockerapi.StopContainerParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.StopContainerResponse, error)
-	RestartContainerWithResponseFunc  func(ctx context.Context, containerId string, params *dockerapi.RestartContainerParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.RestartContainerResponse, error)
+	ListContainersWithResponseFunc     func(ctx context.Context, params *dockerapi.ListContainersParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.ListContainersResponse, error)
+	GetContainerWithResponseFunc       func(ctx context.Context, containerId string, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.GetContainerResponse, error)
+	StartContainerWithResponseFunc     func(ctx context.Context, containerId string, params *dockerapi.StartContainerParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.StartContainerResponse, error)
+	StopContainerWithResponseFunc      func(ctx context.Context, containerId string, params *dockerapi.StopContainerParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.StopContainerResponse, error)
+	RestartContainerWithResponseFunc   func(ctx context.Context, containerId string, params *dockerapi.RestartContainerParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.RestartContainerResponse, error)
 	ListDockerNetworksWithResponseFunc func(ctx context.Context, params *dockerapi.ListDockerNetworksParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.ListDockerNetworksResponse, error)
 	GetDockerNetworkWithResponseFunc   func(ctx context.Context, networkId string, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.GetDockerNetworkResponse, error)
 	ListDockerImagesWithResponseFunc   func(ctx context.Context, params *dockerapi.ListDockerImagesParams, reqEditors ...dockerapi.RequestEditorFn) (*dockerapi.ListDockerImagesResponse, error)

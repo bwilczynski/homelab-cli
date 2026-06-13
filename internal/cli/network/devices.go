@@ -1,8 +1,9 @@
 package network
 
 import (
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -76,7 +77,7 @@ func newListDevicesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return devicesListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return devicesListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
@@ -125,7 +126,7 @@ func newGetDeviceCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return view.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return view.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 	cmd.Flags().BoolVar(&allPorts, "all-ports", false, "Show all ports (default: active ports only)")

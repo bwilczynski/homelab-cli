@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ func newListVlansCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return vlansListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return vlansListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
@@ -43,7 +44,7 @@ func newGetVlanCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return vlansGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return vlansGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

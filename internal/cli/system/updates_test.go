@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 )
 
 func okListUpdatesResp(list systemapi.SystemUpdateList) *systemapi.ListSystemUpdatesResponse {

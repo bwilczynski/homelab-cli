@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ func newListSsidsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return ssidsListView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return ssidsListView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }
@@ -43,7 +44,7 @@ func newGetSsidCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return ssidsGetView.Render(cmd.OutOrStdout(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return ssidsGetView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okVlansResp(list networkapi.VlanList) *networkapi.ListVlansResponse {
@@ -91,8 +91,8 @@ func TestGetVlanCmd_serverDhcp(t *testing.T) {
 				"id": "unifi.iot", "uri": "/network/vlans/unifi.iot",
 				"name": "IoT", "vlanId": 20, "subnet": "192.168.20.0/24",
 				"gatewayIp": "192.168.20.1", "broadcastIp": "192.168.20.255",
-				"dhcpMode": "server",
-				"dhcpRange": map[string]any{"start": "192.168.20.100", "end": "192.168.20.200"},
+				"dhcpMode":   "server",
+				"dhcpRange":  map[string]any{"start": "192.168.20.100", "end": "192.168.20.200"},
 				"dnsServers": []string{"1.1.1.1", "8.8.8.8"},
 			}), nil
 		},
@@ -180,7 +180,7 @@ func TestGetVlanCmd_disabledDhcp(t *testing.T) {
 				"id": "unifi.servers", "uri": "/network/vlans/unifi.servers",
 				"name": "Servers", "vlanId": 10, "subnet": "192.168.10.0/24",
 				"gatewayIp": "192.168.10.1", "broadcastIp": "192.168.10.255",
-				"dhcpMode": "disabled",
+				"dhcpMode":   "disabled",
 				"dnsServers": []string{"1.1.1.1"},
 			}), nil
 		},

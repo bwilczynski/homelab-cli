@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 )
 
 func okSsidsResp(list networkapi.SsidList) *networkapi.ListSsidsResponse {
@@ -98,8 +98,8 @@ func TestGetSsidCmd_withClients(t *testing.T) {
 			return okSsidResp(map[string]any{
 				"id": "unifi.iot", "uri": "/network/ssids/unifi.iot",
 				"name": "IoT", "vlanId": 20,
-				"bands":      []string{"band2g", "band5g"},
-				"numClients": 2,
+				"bands":            []string{"band2g", "band5g"},
+				"numClients":       2,
 				"securityProtocol": "wpa2",
 				"clients": []map[string]any{
 					{"kind": "client", "id": "unifi.sonos", "uri": "/network/clients/unifi.sonos", "name": "Sonos One SL"},
