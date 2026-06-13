@@ -24,6 +24,16 @@ func TestRegistry_matchesAndCounts(t *testing.T) {
 	reg.Verify(t) // should not fail
 }
 
+func TestRegistry_verifyFailsForUnmatchedHandler(t *testing.T) {
+	inner := &testing.T{}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/never/called"), httpmock.JSONResponse(nil))
+	reg.Verify(inner)
+	if !inner.Failed() {
+		t.Error("expected Verify to fail for uncalled handler")
+	}
+}
+
 func TestRegistry_noMatch(t *testing.T) {
 	reg := httpmock.NewRegistry()
 	client := &http.Client{Transport: reg}
