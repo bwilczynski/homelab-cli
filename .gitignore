@@ -2,7 +2,6 @@ bin/
 *.env
 
 # Generated client code (regenerated via make generate)
-internal/*/api.gen.go
 internal/api/*/api.gen.go
 
 # Claude Code local settings
