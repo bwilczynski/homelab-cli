@@ -2,13 +2,12 @@ package system
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/spf13/cobra"
 )
 
 var healthView = cmdutil.View{Templates: systemTemplates, Name: "health.tmpl"}
 
-func newHealthCmd() *cobra.Command {
+func newHealthCmd(f *cmdutil.Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "health",
 		Short: "Show aggregate system health",
@@ -17,7 +16,7 @@ func newHealthCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return healthView.Render(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, resp.JSON200)
+			return healthView.Render(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)
 		},
 	}
 }

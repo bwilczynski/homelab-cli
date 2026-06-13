@@ -11,7 +11,7 @@ import (
 
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
 func okListUpdatesResp(list systemapi.SystemUpdateList) *systemapi.ListSystemUpdatesResponse {
@@ -56,7 +56,7 @@ func TestListUpdatesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newListUpdatesCmd()
+	cmd := newListUpdatesCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -93,7 +93,7 @@ func TestGetUpdateCmd_containerType(t *testing.T) {
 		},
 	}
 
-	cmd := newGetUpdateCmd()
+	cmd := newGetUpdateCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}
@@ -127,7 +127,7 @@ func TestGetUpdateCmd_apiError(t *testing.T) {
 		},
 	}
 
-	cmd := newGetUpdateCmd()
+	cmd := newGetUpdateCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.foo"})
 	buf := &bytes.Buffer{}
@@ -162,7 +162,7 @@ func TestCheckUpdatesCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newCheckUpdatesCmd()
+	cmd := newCheckUpdatesCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -199,10 +199,10 @@ func TestGetUpdateCmd_jsonOutput(t *testing.T) {
 		},
 	}
 
-	t.Cleanup(func() { flags.OutputFormat = "" })
-	flags.OutputFormat = "json"
+	f := cmdutil.TestFactory(t)
+	f.Output = func() output.Format { return output.FormatJSON }
 
-	cmd := newGetUpdateCmd()
+	cmd := newGetUpdateCmd(f)
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	cmd.SetArgs([]string{"nas-1.homeassistant"})
 	buf := &bytes.Buffer{}

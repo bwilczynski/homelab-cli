@@ -34,7 +34,7 @@ func TestInfoCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newInfoCmd()
+	cmd := newInfoCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)

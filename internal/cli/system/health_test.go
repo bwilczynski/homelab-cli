@@ -38,7 +38,7 @@ func TestHealthCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newHealthCmd()
+	cmd := newHealthCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -67,7 +67,7 @@ func TestHealthCmd_apiError(t *testing.T) {
 		},
 	}
 
-	cmd := newHealthCmd()
+	cmd := newHealthCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)

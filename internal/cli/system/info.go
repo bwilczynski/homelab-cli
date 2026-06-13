@@ -3,7 +3,6 @@ package system
 import (
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +17,7 @@ type infoRow struct {
 	Uptime   string
 }
 
-func newInfoCmd() *cobra.Command {
+func newInfoCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "Show device information",
@@ -34,7 +33,7 @@ func newInfoCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return infoView.RenderWith(cmd.OutOrStdout(), flags.GetOutputFormat(), resp.StatusCode(), resp.Body, func() (any, error) {
+		return infoView.RenderWith(cmd.OutOrStdout(), f.Output(), resp.StatusCode(), resp.Body, func() (any, error) {
 			items := make([]infoRow, 0, len(resp.JSON200.Items))
 			for _, info := range resp.JSON200.Items {
 				items = append(items, infoRow{

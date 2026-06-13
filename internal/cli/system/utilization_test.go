@@ -38,7 +38,7 @@ func TestUtilizationCmd_tableOutput(t *testing.T) {
 		},
 	}
 
-	cmd := newUtilizationCmd()
+	cmd := newUtilizationCmd(cmdutil.TestFactory(t))
 	cmdutil.SetClient[SystemClient](cmd, stub)
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)

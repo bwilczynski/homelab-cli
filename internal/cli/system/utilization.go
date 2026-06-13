@@ -7,8 +7,8 @@ import (
 
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	"github.com/bwilczynski/hlctl/internal/cli/flags"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
+	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -21,13 +21,13 @@ type utilizationRow struct {
 	Swap   string
 }
 
-func newUtilizationCmd() *cobra.Command {
+func newUtilizationCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "utilization",
 		Short: "Show live resource utilization",
 	}
 	device := cmdutil.DeviceFlag(cmd)
-	cmd.RunE = watch.Wrap(flags.GetOutputFormat, func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(func() output.Format { return f.Output() }, func(ctx context.Context, w io.Writer) error {
 		params := &systemapi.ListSystemUtilizationParams{}
 		if *device != "" {
 			params.Device = device
@@ -37,7 +37,7 @@ func newUtilizationCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return utilizationView.RenderWith(w, flags.GetOutputFormat(), resp.StatusCode(), resp.Body, func() (any, error) {
+		return utilizationView.RenderWith(w, f.Output(), resp.StatusCode(), resp.Body, func() (any, error) {
 			items := make([]utilizationRow, 0, len(resp.JSON200.Items))
 			for _, u := range resp.JSON200.Items {
 				swapPct := 0

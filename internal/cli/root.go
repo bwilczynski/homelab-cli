@@ -26,7 +26,7 @@ func init() {
 	rootCmd.AddCommand(dockercli.NewCmd())
 	rootCmd.AddCommand(network.NewCmd())
 	rootCmd.AddCommand(storage.NewCmd())
-	rootCmd.AddCommand(system.NewCmd())
+	rootCmd.AddCommand(system.NewCmd(nil))
 }
 
 func Execute(version string) error {
