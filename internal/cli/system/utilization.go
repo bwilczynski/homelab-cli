@@ -8,7 +8,6 @@ import (
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +26,7 @@ func newUtilizationCmd(f *cmdutil.Factory) *cobra.Command {
 		Short: "Show live resource utilization",
 	}
 	device := cmdutil.DeviceFlag(cmd)
-	cmd.RunE = watch.Wrap(func() output.Format { return f.Output() }, func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(f.Output, func(ctx context.Context, w io.Writer) error {
 		params := &systemapi.ListSystemUtilizationParams{}
 		if *device != "" {
 			params.Device = device

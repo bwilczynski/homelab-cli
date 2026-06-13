@@ -7,7 +7,6 @@ import (
 	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +38,7 @@ func newListContainersCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{Use: "list", Short: "List containers"}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = watch.Wrap(
-		func() output.Format { return f.Output() },
+		f.Output,
 		func(ctx context.Context, w io.Writer) error {
 			params := &dockerapi.ListContainersParams{}
 			if *device != "" {

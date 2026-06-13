@@ -7,7 +7,6 @@ import (
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +44,7 @@ func newListClientsCmd(f *cmdutil.Factory) *cobra.Command {
 		Use:   "list",
 		Short: "List network clients",
 	}
-	cmd.RunE = watch.Wrap(func() output.Format { return f.Output() }, func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(f.Output, func(ctx context.Context, w io.Writer) error {
 		params := &networkapi.ListNetworkClientsParams{}
 		if statusFilter != "" {
 			s := networkapi.NetworkClientStatus(statusFilter)
