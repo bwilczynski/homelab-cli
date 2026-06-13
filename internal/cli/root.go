@@ -22,7 +22,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&flags.OutputFormat, "output", "o", "table", "Output format: table or json")
 	rootCmd.PersistentFlags().StringVar(&flags.APIURL, "api-url", "", "Override API base URL")
 	rootCmd.AddCommand(auth.NewCmd(nil)) // nil replaced by Task 14's NewRootCmd(f)
-	rootCmd.AddCommand(config.NewCmd())
+	rootCmd.AddCommand(config.NewCmd(nil))
 	rootCmd.AddCommand(dockercli.NewCmd())
 	rootCmd.AddCommand(network.NewCmd())
 	rootCmd.AddCommand(storage.NewCmd())

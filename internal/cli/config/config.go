@@ -3,11 +3,12 @@ package config
 import (
 	"fmt"
 
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	appconfig "github.com/bwilczynski/hlctl/internal/config"
 	"github.com/spf13/cobra"
 )
 
-func NewCmd() *cobra.Command {
+func NewCmd(_ *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage hlctl configuration",
