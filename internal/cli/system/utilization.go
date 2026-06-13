@@ -27,7 +27,7 @@ func newUtilizationCmd() *cobra.Command {
 		Short: "Show live resource utilization",
 	}
 	device := cmdutil.DeviceFlag(cmd)
-	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(flags.GetOutputFormat, func(ctx context.Context, w io.Writer) error {
 		params := &systemapi.ListSystemUtilizationParams{}
 		if *device != "" {
 			params.Device = device

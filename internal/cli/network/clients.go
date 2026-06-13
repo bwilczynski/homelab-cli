@@ -45,7 +45,7 @@ func newListClientsCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List network clients",
 	}
-	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(flags.GetOutputFormat, func(ctx context.Context, w io.Writer) error {
 		params := &networkapi.ListNetworkClientsParams{}
 		if statusFilter != "" {
 			s := networkapi.NetworkClientStatus(statusFilter)

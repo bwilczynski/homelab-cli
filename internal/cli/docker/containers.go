@@ -26,7 +26,7 @@ func newContainersCmd() *cobra.Command {
 func newListContainersCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "list", Short: "List containers"}
 	device := cmdutil.DeviceFlag(cmd)
-	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(flags.GetOutputFormat, func(ctx context.Context, w io.Writer) error {
 		params := &dockerapi.ListContainersParams{}
 		if *device != "" {
 			params.Device = device

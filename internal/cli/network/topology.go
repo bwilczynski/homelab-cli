@@ -35,7 +35,7 @@ func newTopologyCmd() *cobra.Command {
 		Use:   "topology",
 		Short: "Show network topology",
 	}
-	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
+	cmd.RunE = watch.Wrap(flags.GetOutputFormat, func(ctx context.Context, w io.Writer) error {
 		params := &networkapi.GetNetworkTopologyParams{}
 		if includeClients || includeWireless {
 			t := true
