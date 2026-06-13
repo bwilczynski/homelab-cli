@@ -9,39 +9,39 @@ import (
 	"testing"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/network"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 )
 
-func okDevicesResp(list gen.NetworkDeviceList) *gen.ListNetworkDevicesResponse {
+func okDevicesResp(list networkapi.NetworkDeviceList) *networkapi.ListNetworkDevicesResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListNetworkDevicesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &networkapi.ListNetworkDevicesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func errDevicesResp(status int, body map[string]any) *gen.ListNetworkDevicesResponse {
+func errDevicesResp(status int, body map[string]any) *networkapi.ListNetworkDevicesResponse {
 	b, _ := json.Marshal(body)
-	return &gen.ListNetworkDevicesResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.ListNetworkDevicesResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
-func okDeviceResp(data map[string]any) *gen.GetNetworkDeviceResponse {
+func okDeviceResp(data map[string]any) *networkapi.GetNetworkDeviceResponse {
 	b, _ := json.Marshal(data)
-	var typed gen.NetworkDeviceDetail
+	var typed networkapi.NetworkDeviceDetail
 	_ = json.Unmarshal(b, &typed)
-	return &gen.GetNetworkDeviceResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+	return &networkapi.GetNetworkDeviceResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
 }
 
 func TestListDevicesCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListNetworkDevicesWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListNetworkDevicesResponse, error) {
-			return okDevicesResp(gen.NetworkDeviceList{
-				Items: []gen.NetworkDevice{
+		ListNetworkDevicesWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListNetworkDevicesResponse, error) {
+			return okDevicesResp(networkapi.NetworkDeviceList{
+				Items: []networkapi.NetworkDevice{
 					{
 						Id:     "unifi.usg",
 						Uri:    "/network/devices/unifi.usg",
 						Name:   "USG",
 						Mac:    "aa:bb:cc:dd:00:01",
 						Ip:     "192.168.1.1",
-						Type:   gen.NetworkDeviceTypeGateway,
-						Status: gen.NetworkDeviceStatusConnected,
+						Type:   networkapi.NetworkDeviceTypeGateway,
+						Status: networkapi.NetworkDeviceStatusConnected,
 					},
 					{
 						Id:     "unifi.ap-living-room",
@@ -49,8 +49,8 @@ func TestListDevicesCmd_tableOutput(t *testing.T) {
 						Name:   "AP Living Room",
 						Mac:    "aa:bb:cc:dd:00:03",
 						Ip:     "192.168.1.3",
-						Type:   gen.NetworkDeviceTypeAccessPoint,
-						Status: gen.NetworkDeviceStatusConnected,
+						Type:   networkapi.NetworkDeviceTypeAccessPoint,
+						Status: networkapi.NetworkDeviceStatusConnected,
 					},
 				},
 			}), nil
@@ -79,7 +79,7 @@ func TestListDevicesCmd_tableOutput(t *testing.T) {
 
 func TestListDevicesCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListNetworkDevicesWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListNetworkDevicesResponse, error) {
+		ListNetworkDevicesWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListNetworkDevicesResponse, error) {
 			return errDevicesResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
@@ -104,7 +104,7 @@ func TestListDevicesCmd_apiError(t *testing.T) {
 
 func TestGetDeviceCmd_gateway(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkDeviceResponse, error) {
 			return okDeviceResp(map[string]any{
 				"id": "unifi.usg", "uri": "/network/devices/unifi.usg",
 				"name": "USG", "mac": "aa:bb:cc:dd:00:01", "ip": "192.168.1.1",
@@ -141,7 +141,7 @@ func TestGetDeviceCmd_gateway(t *testing.T) {
 
 func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkDeviceResponse, error) {
 			return okDeviceResp(map[string]any{
 				"id": "unifi.mystery", "uri": "/network/devices/unifi.mystery",
 				"name": "Mystery Device", "mac": "aa:bb:cc:dd:00:ff", "ip": "192.168.1.99",
@@ -177,7 +177,7 @@ func TestGetDeviceCmd_unknownWithUplink(t *testing.T) {
 
 func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkDeviceResponse, error) {
 			return okDeviceResp(map[string]any{
 				"id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr",
 				"name": "Switch Living Room", "mac": "aa:bb:cc:dd:00:10", "ip": "192.168.1.10",
@@ -224,7 +224,7 @@ func TestGetDeviceCmd_switch_activePorts(t *testing.T) {
 
 func TestGetDeviceCmd_switch_allPorts(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkDeviceResponse, error) {
 			return okDeviceResp(map[string]any{
 				"id": "unifi.switch-lr", "uri": "/network/devices/unifi.switch-lr",
 				"name": "Switch Living Room", "mac": "aa:bb:cc:dd:00:10", "ip": "192.168.1.10",
@@ -258,7 +258,7 @@ func TestGetDeviceCmd_switch_allPorts(t *testing.T) {
 
 func TestGetDeviceCmd_accessPoint(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetNetworkDeviceResponse, error) {
+		GetNetworkDeviceWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkDeviceResponse, error) {
 			return okDeviceResp(map[string]any{
 				"id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room",
 				"name": "AP Living Room", "mac": "aa:bb:cc:dd:00:03", "ip": "192.168.1.3",

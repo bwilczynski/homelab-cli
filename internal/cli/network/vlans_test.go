@@ -9,36 +9,36 @@ import (
 	"testing"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/network"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 )
 
-func okVlansResp(list gen.VlanList) *gen.ListVlansResponse {
+func okVlansResp(list networkapi.VlanList) *networkapi.ListVlansResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListVlansResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &networkapi.ListVlansResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func errVlansResp(status int, body map[string]any) *gen.ListVlansResponse {
+func errVlansResp(status int, body map[string]any) *networkapi.ListVlansResponse {
 	b, _ := json.Marshal(body)
-	return &gen.ListVlansResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.ListVlansResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
-func okVlanResp(data map[string]any) *gen.GetVlanResponse {
+func okVlanResp(data map[string]any) *networkapi.GetVlanResponse {
 	b, _ := json.Marshal(data)
-	var typed gen.VlanDetail
+	var typed networkapi.VlanDetail
 	_ = json.Unmarshal(b, &typed)
-	return &gen.GetVlanResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+	return &networkapi.GetVlanResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
 }
 
-func errVlanResp(status int, body map[string]any) *gen.GetVlanResponse {
+func errVlanResp(status int, body map[string]any) *networkapi.GetVlanResponse {
 	b, _ := json.Marshal(body)
-	return &gen.GetVlanResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.GetVlanResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
 func TestListVlansCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListVlansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListVlansResponse, error) {
-			return okVlansResp(gen.VlanList{
-				Items: []gen.Vlan{
+		ListVlansWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListVlansResponse, error) {
+			return okVlansResp(networkapi.VlanList{
+				Items: []networkapi.Vlan{
 					{Id: "unifi.default", Name: "Default", VlanId: 1, Subnet: "192.168.1.0/24"},
 					{Id: "unifi.iot", Name: "IoT", VlanId: 20, Subnet: "192.168.20.0/24"},
 				},
@@ -63,7 +63,7 @@ func TestListVlansCmd_tableOutput(t *testing.T) {
 
 func TestListVlansCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListVlansWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListVlansResponse, error) {
+		ListVlansWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListVlansResponse, error) {
 			return errVlansResp(http.StatusUnauthorized, map[string]any{
 				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
 				"status": 401, "detail": "Bearer token missing",
@@ -86,7 +86,7 @@ func TestListVlansCmd_apiError(t *testing.T) {
 
 func TestGetVlanCmd_serverDhcp(t *testing.T) {
 	stub := &StubClient{
-		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetVlanResponse, error) {
 			return okVlanResp(map[string]any{
 				"id": "unifi.iot", "uri": "/network/vlans/unifi.iot",
 				"name": "IoT", "vlanId": 20, "subnet": "192.168.20.0/24",
@@ -119,7 +119,7 @@ func TestGetVlanCmd_serverDhcp(t *testing.T) {
 
 func TestGetVlanCmd_relayDhcp(t *testing.T) {
 	stub := &StubClient{
-		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetVlanResponse, error) {
 			return okVlanResp(map[string]any{
 				"id": "unifi.mgmt", "uri": "/network/vlans/unifi.mgmt",
 				"name": "Management", "vlanId": 99, "subnet": "10.0.99.0/24",
@@ -151,7 +151,7 @@ func TestGetVlanCmd_relayDhcp(t *testing.T) {
 
 func TestGetVlanCmd_notFound(t *testing.T) {
 	stub := &StubClient{
-		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetVlanResponse, error) {
 			return errVlanResp(http.StatusNotFound, map[string]any{
 				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
 				"status": 404, "detail": "vlan not found",
@@ -175,7 +175,7 @@ func TestGetVlanCmd_notFound(t *testing.T) {
 
 func TestGetVlanCmd_disabledDhcp(t *testing.T) {
 	stub := &StubClient{
-		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetVlanResponse, error) {
+		GetVlanWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetVlanResponse, error) {
 			return okVlanResp(map[string]any{
 				"id": "unifi.servers", "uri": "/network/vlans/unifi.servers",
 				"name": "Servers", "vlanId": 10, "subnet": "192.168.10.0/24",

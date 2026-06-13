@@ -10,24 +10,24 @@ import (
 	"time"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/system"
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 )
 
-func okUtilizationResp(list gen.SystemUtilizationList) *gen.ListSystemUtilizationResponse {
+func okUtilizationResp(list systemapi.SystemUtilizationList) *systemapi.ListSystemUtilizationResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListSystemUtilizationResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &systemapi.ListSystemUtilizationResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
 func TestUtilizationCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListSystemUtilizationWithResponseFunc: func(_ context.Context, _ *gen.ListSystemUtilizationParams, _ ...gen.RequestEditorFn) (*gen.ListSystemUtilizationResponse, error) {
-			return okUtilizationResp(gen.SystemUtilizationList{
-				Items: []gen.SystemUtilization{
+		ListSystemUtilizationWithResponseFunc: func(_ context.Context, _ *systemapi.ListSystemUtilizationParams, _ ...systemapi.RequestEditorFn) (*systemapi.ListSystemUtilizationResponse, error) {
+			return okUtilizationResp(systemapi.SystemUtilizationList{
+				Items: []systemapi.SystemUtilization{
 					{
 						Device:    "nas-1",
 						SampledAt: time.Now(),
-						Cpu:       gen.CpuUsage{TotalPercent: 12},
-						Memory: gen.MemoryUsage{
+						Cpu:       systemapi.CpuUsage{TotalPercent: 12},
+						Memory: systemapi.MemoryUsage{
 							UsedPercent:    68,
 							SwapTotalBytes: 2_147_483_648,
 							SwapUsedBytes:  0,

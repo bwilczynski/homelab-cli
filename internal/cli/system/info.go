@@ -3,7 +3,7 @@ package system
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/output"
-	gen "github.com/bwilczynski/hlctl/internal/system"
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,7 @@ func newInfoCmd() *cobra.Command {
 	}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		params := &gen.ListSystemInfoParams{}
+		params := &systemapi.ListSystemInfoParams{}
 		if *device != "" {
 			params.Device = device
 		}

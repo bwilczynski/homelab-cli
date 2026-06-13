@@ -9,44 +9,44 @@ import (
 	"testing"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/network"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 )
 
-func okSsidsResp(list gen.SsidList) *gen.ListSsidsResponse {
+func okSsidsResp(list networkapi.SsidList) *networkapi.ListSsidsResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &networkapi.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func errSsidsResp(status int, body map[string]any) *gen.ListSsidsResponse {
+func errSsidsResp(status int, body map[string]any) *networkapi.ListSsidsResponse {
 	b, _ := json.Marshal(body)
-	return &gen.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
-func okSsidResp(data map[string]any) *gen.GetSsidResponse {
+func okSsidResp(data map[string]any) *networkapi.GetSsidResponse {
 	b, _ := json.Marshal(data)
-	var typed gen.SsidDetail
+	var typed networkapi.SsidDetail
 	_ = json.Unmarshal(b, &typed)
-	return &gen.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+	return &networkapi.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
 }
 
-func errSsidResp(status int, body map[string]any) *gen.GetSsidResponse {
+func errSsidResp(status int, body map[string]any) *networkapi.GetSsidResponse {
 	b, _ := json.Marshal(body)
-	return &gen.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
 func TestListSsidsCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListSsidsWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListSsidsResponse, error) {
-			return okSsidsResp(gen.SsidList{
-				Items: []gen.Ssid{
+		ListSsidsWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListSsidsResponse, error) {
+			return okSsidsResp(networkapi.SsidList{
+				Items: []networkapi.Ssid{
 					{
 						Id: "unifi.home", Name: "Home", VlanId: 1,
-						Bands:      []gen.WifiBand{gen.WifiBandBand2g, gen.WifiBandBand5g, gen.WifiBandBand6g},
+						Bands:      []networkapi.WifiBand{networkapi.WifiBandBand2g, networkapi.WifiBandBand5g, networkapi.WifiBandBand6g},
 						NumClients: 12,
 					},
 					{
 						Id: "unifi.iot", Name: "IoT", VlanId: 20,
-						Bands:      []gen.WifiBand{gen.WifiBandBand2g, gen.WifiBandBand5g},
+						Bands:      []networkapi.WifiBand{networkapi.WifiBandBand2g, networkapi.WifiBandBand5g},
 						NumClients: 8,
 					},
 				},
@@ -71,7 +71,7 @@ func TestListSsidsCmd_tableOutput(t *testing.T) {
 
 func TestListSsidsCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListSsidsWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.ListSsidsResponse, error) {
+		ListSsidsWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListSsidsResponse, error) {
 			return errSsidsResp(http.StatusUnauthorized, map[string]any{
 				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
 				"status": 401, "detail": "Bearer token missing",
@@ -94,7 +94,7 @@ func TestListSsidsCmd_apiError(t *testing.T) {
 
 func TestGetSsidCmd_withClients(t *testing.T) {
 	stub := &StubClient{
-		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetSsidResponse, error) {
+		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetSsidResponse, error) {
 			return okSsidResp(map[string]any{
 				"id": "unifi.iot", "uri": "/network/ssids/unifi.iot",
 				"name": "IoT", "vlanId": 20,
@@ -130,7 +130,7 @@ func TestGetSsidCmd_withClients(t *testing.T) {
 
 func TestGetSsidCmd_notFound(t *testing.T) {
 	stub := &StubClient{
-		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetSsidResponse, error) {
+		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetSsidResponse, error) {
 			return errSsidResp(http.StatusNotFound, map[string]any{
 				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
 				"status": 404, "detail": "ssid not found",

@@ -2,22 +2,22 @@ package network
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/network"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/spf13/cobra"
 )
 
 var devicesListView = cmdutil.View{Templates: networkTemplates, Name: "devices_list.tmpl"}
 
-// switchDetailView wraps gen.SwitchDetail with pre-resolved port data.
-// The Ports field shadows gen.SwitchDetail.Ports so the template always
+// switchDetailView wraps networkapi.SwitchDetail with pre-resolved port data.
+// The Ports field shadows networkapi.SwitchDetail.Ports so the template always
 // sees []switchPortView, with ConnectedToName already resolved.
 type switchDetailView struct {
-	gen.SwitchDetail
+	networkapi.SwitchDetail
 	Ports []switchPortView
 }
 
 type switchPortView struct {
-	gen.SwitchPort
+	networkapi.SwitchPort
 	ConnectedToName string
 }
 
@@ -25,10 +25,10 @@ type switchPortView struct {
 // When allPorts is false, only ports with state "up" are returned. Each
 // remaining port's ConnectedTo field is resolved to a display name (device or
 // client name, or "-" when nothing is connected).
-func buildSwitchPortViews(ports []gen.SwitchPort, allPorts bool) ([]switchPortView, error) {
+func buildSwitchPortViews(ports []networkapi.SwitchPort, allPorts bool) ([]switchPortView, error) {
 	var out []switchPortView
 	for _, p := range ports {
-		if !allPorts && p.State != gen.NetworkPortStateUp {
+		if !allPorts && p.State != networkapi.NetworkPortStateUp {
 			continue
 		}
 		connectedTo := "-"
@@ -89,12 +89,12 @@ func newGetDeviceCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Inline so the "switch" Resolve closure can capture the --all-ports flag.
-			view := cmdutil.PolymorphicView[gen.NetworkDeviceDetail]{
+			view := cmdutil.PolymorphicView[networkapi.NetworkDeviceDetail]{
 				Templates: networkTemplates,
-				Variants: map[string]cmdutil.Variant[gen.NetworkDeviceDetail]{
+				Variants: map[string]cmdutil.Variant[networkapi.NetworkDeviceDetail]{
 					"switch": {
 						Template: "devices_get_switch.tmpl",
-						Resolve: func(d gen.NetworkDeviceDetail) (any, error) {
+						Resolve: func(d networkapi.NetworkDeviceDetail) (any, error) {
 							sw, err := d.AsSwitchDetail()
 							if err != nil {
 								return nil, err
@@ -108,15 +108,15 @@ func newGetDeviceCmd() *cobra.Command {
 					},
 					"accessPoint": {
 						Template: "devices_get_accesspoint.tmpl",
-						Resolve:  func(d gen.NetworkDeviceDetail) (any, error) { return d.AsAccessPointDetail() },
+						Resolve:  func(d networkapi.NetworkDeviceDetail) (any, error) { return d.AsAccessPointDetail() },
 					},
 					"gateway": {
 						Template: "devices_get_gateway.tmpl",
-						Resolve:  func(d gen.NetworkDeviceDetail) (any, error) { return d.AsGatewayDetail() },
+						Resolve:  func(d networkapi.NetworkDeviceDetail) (any, error) { return d.AsGatewayDetail() },
 					},
 					"unknown": {
 						Template: "devices_get_unknown.tmpl",
-						Resolve:  func(d gen.NetworkDeviceDetail) (any, error) { return d.AsUnknownDeviceDetail() },
+						Resolve:  func(d networkapi.NetworkDeviceDetail) (any, error) { return d.AsUnknownDeviceDetail() },
 					},
 				},
 			}

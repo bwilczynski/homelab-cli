@@ -9,22 +9,22 @@ import (
 	"testing"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/docker"
+	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 )
 
-func okImagesResp(list gen.DockerImageList) *gen.ListDockerImagesResponse {
+func okImagesResp(list dockerapi.DockerImageList) *dockerapi.ListDockerImagesResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListDockerImagesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &dockerapi.ListDockerImagesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func okImageResp(detail gen.DockerImageDetail) *gen.GetDockerImageResponse {
+func okImageResp(detail dockerapi.DockerImageDetail) *dockerapi.GetDockerImageResponse {
 	b, _ := json.Marshal(detail)
-	return &gen.GetDockerImageResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
+	return &dockerapi.GetDockerImageResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
 }
 
 func TestListImagesCmd_tableOutput(t *testing.T) {
-	list := gen.DockerImageList{
-		Items: []gen.DockerImage{
+	list := dockerapi.DockerImageList{
+		Items: []dockerapi.DockerImage{
 			{
 				Id:         "nas-1.925ff61909ae",
 				Device:     "nas-1",
@@ -35,7 +35,7 @@ func TestListImagesCmd_tableOutput(t *testing.T) {
 		},
 	}
 	stub := &StubClient{
-		ListDockerImagesWithResponseFunc: func(_ context.Context, _ *gen.ListDockerImagesParams, _ ...gen.RequestEditorFn) (*gen.ListDockerImagesResponse, error) {
+		ListDockerImagesWithResponseFunc: func(_ context.Context, _ *dockerapi.ListDockerImagesParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.ListDockerImagesResponse, error) {
 			return okImagesResp(list), nil
 		},
 	}
@@ -58,7 +58,7 @@ func TestListImagesCmd_tableOutput(t *testing.T) {
 }
 
 func TestGetImageCmd_tableOutput(t *testing.T) {
-	detail := gen.DockerImageDetail{
+	detail := dockerapi.DockerImageDetail{
 		Id:          "nas-1.925ff61909ae",
 		Device:      "nas-1",
 		Repository:  "ghcr.io/immich-app/immich-server",
@@ -67,7 +67,7 @@ func TestGetImageCmd_tableOutput(t *testing.T) {
 		VirtualSize: 1073741824,
 	}
 	stub := &StubClient{
-		GetDockerImageWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetDockerImageResponse, error) {
+		GetDockerImageWithResponseFunc: func(_ context.Context, _ string, _ ...dockerapi.RequestEditorFn) (*dockerapi.GetDockerImageResponse, error) {
 			return okImageResp(detail), nil
 		},
 	}

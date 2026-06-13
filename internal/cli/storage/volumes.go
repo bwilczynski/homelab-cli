@@ -2,7 +2,7 @@ package storage
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/storage"
+	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ func newListVolumesCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "list", Short: "List storage volumes"}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
-		params := &gen.ListStorageVolumesParams{}
+		params := &storageapi.ListStorageVolumesParams{}
 		if *device != "" {
 			params.Device = device
 		}

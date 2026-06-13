@@ -10,24 +10,24 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/flags"
-	gen "github.com/bwilczynski/hlctl/internal/network"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 )
 
-func okTopologyResp(data map[string]any) *gen.GetNetworkTopologyResponse {
+func okTopologyResp(data map[string]any) *networkapi.GetNetworkTopologyResponse {
 	b, _ := json.Marshal(data)
-	var typed gen.NetworkTopology
+	var typed networkapi.NetworkTopology
 	_ = json.Unmarshal(b, &typed)
-	return &gen.GetNetworkTopologyResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
+	return &networkapi.GetNetworkTopologyResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
 }
 
-func errTopologyResp(status int, body map[string]any) *gen.GetNetworkTopologyResponse {
+func errTopologyResp(status int, body map[string]any) *networkapi.GetNetworkTopologyResponse {
 	b, _ := json.Marshal(body)
-	return &gen.GetNetworkTopologyResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &networkapi.GetNetworkTopologyResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
 func TestTopologyCmd_devicesOnly(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *networkapi.GetNetworkTopologyParams, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkTopologyResponse, error) {
 			if params.IncludeClients != nil {
 				t.Errorf("expected no IncludeClients param, got %v", *params.IncludeClients)
 			}
@@ -90,7 +90,7 @@ func TestTopologyCmd_devicesOnly(t *testing.T) {
 
 func TestTopologyCmd_includeClientsWiredOnly(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *networkapi.GetNetworkTopologyParams, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkTopologyResponse, error) {
 			if params.IncludeClients == nil || !*params.IncludeClients {
 				t.Error("expected IncludeClients=true")
 			}
@@ -161,7 +161,7 @@ func TestTopologyCmd_includeClientsWiredOnly(t *testing.T) {
 
 func TestTopologyCmd_includeWireless(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, params *networkapi.GetNetworkTopologyParams, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkTopologyResponse, error) {
 			if params.IncludeClients == nil || !*params.IncludeClients {
 				t.Error("expected IncludeClients=true (implied by --include-wireless)")
 			}
@@ -215,7 +215,7 @@ func TestTopologyCmd_jsonOutput(t *testing.T) {
 	defer func() { flags.OutputFormat = old }()
 
 	stub := &StubClient{
-		GetNetworkTopologyWithResponseFunc: func(_ context.Context, _ *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, _ *networkapi.GetNetworkTopologyParams, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkTopologyResponse, error) {
 			return okTopologyResp(map[string]any{
 				"nodes": []any{},
 				"edges": []any{},
@@ -240,7 +240,7 @@ func TestTopologyCmd_jsonOutput(t *testing.T) {
 
 func TestTopologyCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		GetNetworkTopologyWithResponseFunc: func(_ context.Context, _ *gen.GetNetworkTopologyParams, _ ...gen.RequestEditorFn) (*gen.GetNetworkTopologyResponse, error) {
+		GetNetworkTopologyWithResponseFunc: func(_ context.Context, _ *networkapi.GetNetworkTopologyParams, _ ...networkapi.RequestEditorFn) (*networkapi.GetNetworkTopologyResponse, error) {
 			return errTopologyResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",

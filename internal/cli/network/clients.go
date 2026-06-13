@@ -6,23 +6,23 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	gen "github.com/bwilczynski/hlctl/internal/network"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/spf13/cobra"
 )
 
 var (
 	clientsListView = cmdutil.View{Templates: networkTemplates, Name: "clients_list.tmpl"}
 
-	clientGetView = cmdutil.PolymorphicView[gen.NetworkClientDetail]{
+	clientGetView = cmdutil.PolymorphicView[networkapi.NetworkClientDetail]{
 		Templates: networkTemplates,
-		Variants: map[string]cmdutil.Variant[gen.NetworkClientDetail]{
+		Variants: map[string]cmdutil.Variant[networkapi.NetworkClientDetail]{
 			"wired": {
 				Template: "clients_get_wired.tmpl",
-				Resolve:  func(d gen.NetworkClientDetail) (any, error) { return d.AsWiredNetworkClientDetail() },
+				Resolve:  func(d networkapi.NetworkClientDetail) (any, error) { return d.AsWiredNetworkClientDetail() },
 			},
 			"wireless": {
 				Template: "clients_get_wireless.tmpl",
-				Resolve:  func(d gen.NetworkClientDetail) (any, error) { return d.AsWirelessNetworkClientDetail() },
+				Resolve:  func(d networkapi.NetworkClientDetail) (any, error) { return d.AsWirelessNetworkClientDetail() },
 			},
 		},
 	}
@@ -45,9 +45,9 @@ func newListClientsCmd() *cobra.Command {
 		Short: "List network clients",
 	}
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		params := &gen.ListNetworkClientsParams{}
+		params := &networkapi.ListNetworkClientsParams{}
 		if statusFilter != "" {
-			s := gen.NetworkClientStatus(statusFilter)
+			s := networkapi.NetworkClientStatus(statusFilter)
 			params.Status = &s
 		}
 

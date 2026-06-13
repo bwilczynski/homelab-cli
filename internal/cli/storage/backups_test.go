@@ -10,44 +10,44 @@ import (
 	"time"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/storage"
+	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
 )
 
-func okBackupsResp(list gen.BackupTaskList) *gen.ListBackupsResponse {
+func okBackupsResp(list storageapi.BackupTaskList) *storageapi.ListBackupsResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListBackupsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &storageapi.ListBackupsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func errBackupsResp(status int, body map[string]any) *gen.ListBackupsResponse {
+func errBackupsResp(status int, body map[string]any) *storageapi.ListBackupsResponse {
 	b, _ := json.Marshal(body)
-	return &gen.ListBackupsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &storageapi.ListBackupsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
-func okBackupResp(data gen.BackupTaskDetail) *gen.GetBackupResponse {
+func okBackupResp(data storageapi.BackupTaskDetail) *storageapi.GetBackupResponse {
 	b, _ := json.Marshal(data)
-	return &gen.GetBackupResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
+	return &storageapi.GetBackupResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
 }
 
-func errBackupResp(status int, body map[string]any) *gen.GetBackupResponse {
+func errBackupResp(status int, body map[string]any) *storageapi.GetBackupResponse {
 	b, _ := json.Marshal(body)
-	return &gen.GetBackupResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &storageapi.GetBackupResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
 func TestListBackupsCmd_tableOutput(t *testing.T) {
-	list := gen.BackupTaskList{
-		Items: []gen.BackupTask{
+	list := storageapi.BackupTaskList{
+		Items: []storageapi.BackupTask{
 			{
 				Id:         "nas-1.daily-backup",
 				Name:       "Daily Backup",
 				Device:     "nas-1",
-				Status:     gen.Idle,
-				LastResult: gen.BackupTaskResultSuccess,
+				Status:     storageapi.Idle,
+				LastResult: storageapi.BackupTaskResultSuccess,
 				Type:       "hyperBackup",
 			},
 		},
 	}
 	stub := &StubClient{
-		ListBackupsWithResponseFunc: func(_ context.Context, _ *gen.ListBackupsParams, _ ...gen.RequestEditorFn) (*gen.ListBackupsResponse, error) {
+		ListBackupsWithResponseFunc: func(_ context.Context, _ *storageapi.ListBackupsParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListBackupsResponse, error) {
 			return okBackupsResp(list), nil
 		},
 	}
@@ -71,7 +71,7 @@ func TestListBackupsCmd_tableOutput(t *testing.T) {
 
 func TestListBackupsCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		ListBackupsWithResponseFunc: func(_ context.Context, _ *gen.ListBackupsParams, _ ...gen.RequestEditorFn) (*gen.ListBackupsResponse, error) {
+		ListBackupsWithResponseFunc: func(_ context.Context, _ *storageapi.ListBackupsParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListBackupsResponse, error) {
 			return errBackupsResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",
@@ -97,18 +97,18 @@ func TestListBackupsCmd_apiError(t *testing.T) {
 func TestGetBackupCmd_withDates(t *testing.T) {
 	lastRun := time.Date(2026, 4, 30, 3, 0, 0, 0, time.UTC)
 	nextRun := time.Date(2026, 5, 1, 3, 0, 0, 0, time.UTC)
-	detail := gen.BackupTaskDetail{
+	detail := storageapi.BackupTaskDetail{
 		Id:         "nas-1.daily-backup",
 		Name:       "Daily Backup",
 		Device:     "nas-1",
-		Status:     gen.Idle,
-		LastResult: gen.BackupTaskResultSuccess,
+		Status:     storageapi.Idle,
+		LastResult: storageapi.BackupTaskResultSuccess,
 		Type:       "hyperBackup",
 		LastRunAt:  &lastRun,
 		NextRunAt:  &nextRun,
 	}
 	stub := &StubClient{
-		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetBackupResponse, error) {
+		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetBackupResponse, error) {
 			return okBackupResp(detail), nil
 		},
 	}
@@ -132,20 +132,20 @@ func TestGetBackupCmd_withDates(t *testing.T) {
 }
 
 func TestGetBackupCmd_withSizeAndFolders(t *testing.T) {
-	size := gen.Bytes(10737418240)
+	size := storageapi.Bytes(10737418240)
 	folders := []string{"/volume1/photos", "/volume1/documents"}
-	detail := gen.BackupTaskDetail{
+	detail := storageapi.BackupTaskDetail{
 		Id:         "nas-1.daily-backup",
 		Name:       "Daily Backup",
 		Device:     "nas-1",
-		Status:     gen.Idle,
-		LastResult: gen.BackupTaskResultSuccess,
+		Status:     storageapi.Idle,
+		LastResult: storageapi.BackupTaskResultSuccess,
 		Type:       "hyperBackup",
 		Size:       &size,
 		Folders:    &folders,
 	}
 	stub := &StubClient{
-		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetBackupResponse, error) {
+		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetBackupResponse, error) {
 			return okBackupResp(detail), nil
 		},
 	}
@@ -170,7 +170,7 @@ func TestGetBackupCmd_withSizeAndFolders(t *testing.T) {
 
 func TestGetBackupCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetBackupResponse, error) {
+		GetBackupWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetBackupResponse, error) {
 			return errBackupResp(http.StatusNotFound, map[string]any{
 				"type":   "https://homelab.local/problems/not-found",
 				"title":  "Not Found",

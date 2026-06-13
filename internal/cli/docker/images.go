@@ -2,7 +2,7 @@ package docker
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/docker"
+	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ func newListImagesCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "list", Short: "List Docker images"}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		params := &gen.ListDockerImagesParams{}
+		params := &dockerapi.ListDockerImagesParams{}
 		if *device != "" {
 			params.Device = device
 		}

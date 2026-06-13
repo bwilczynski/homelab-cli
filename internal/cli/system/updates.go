@@ -2,18 +2,18 @@ package system
 
 import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/system"
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/spf13/cobra"
 )
 
 var (
 	updatesListView = cmdutil.View{Templates: systemTemplates, Name: "updates_list.tmpl"}
-	updateGetView   = cmdutil.PolymorphicView[gen.SystemUpdateDetail]{
+	updateGetView   = cmdutil.PolymorphicView[systemapi.SystemUpdateDetail]{
 		Templates: systemTemplates,
-		Variants: map[string]cmdutil.Variant[gen.SystemUpdateDetail]{
+		Variants: map[string]cmdutil.Variant[systemapi.SystemUpdateDetail]{
 			"container": {
 				Template: "updates_get_container.tmpl",
-				Resolve:  func(d gen.SystemUpdateDetail) (any, error) { return d.AsContainerSystemUpdateDetail() },
+				Resolve:  func(d systemapi.SystemUpdateDetail) (any, error) { return d.AsContainerSystemUpdateDetail() },
 			},
 		},
 	}
@@ -35,13 +35,13 @@ func newListUpdatesCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List tracked software updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params := &gen.ListSystemUpdatesParams{}
+			params := &systemapi.ListSystemUpdatesParams{}
 			if status != "" {
-				s := gen.UpdateStatusFilter(status)
+				s := systemapi.UpdateStatusFilter(status)
 				params.Status = &s
 			}
 			if updateType != "" {
-				ut := gen.UpdateTypeFilter(updateType)
+				ut := systemapi.UpdateTypeFilter(updateType)
 				params.Type = &ut
 			}
 
@@ -78,7 +78,7 @@ func newCheckUpdatesCmd() *cobra.Command {
 		Use:   "check",
 		Short: "Force check for upstream updates",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resp, err := cmdutil.Client[SystemClient](cmd).CheckSystemUpdatesWithResponse(cmd.Context(), &gen.CheckSystemUpdatesParams{})
+			resp, err := cmdutil.Client[SystemClient](cmd).CheckSystemUpdatesWithResponse(cmd.Context(), &systemapi.CheckSystemUpdatesParams{})
 			if err != nil {
 				return err
 			}

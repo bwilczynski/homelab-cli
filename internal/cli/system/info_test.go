@@ -9,19 +9,19 @@ import (
 	"testing"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/system"
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 )
 
-func okInfoResp(list gen.SystemInfoList) *gen.ListSystemInfoResponse {
+func okInfoResp(list systemapi.SystemInfoList) *systemapi.ListSystemInfoResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListSystemInfoResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &systemapi.ListSystemInfoResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
 func TestInfoCmd_tableOutput(t *testing.T) {
 	stub := &StubClient{
-		ListSystemInfoWithResponseFunc: func(_ context.Context, _ *gen.ListSystemInfoParams, _ ...gen.RequestEditorFn) (*gen.ListSystemInfoResponse, error) {
-			return okInfoResp(gen.SystemInfoList{
-				Items: []gen.SystemInfo{
+		ListSystemInfoWithResponseFunc: func(_ context.Context, _ *systemapi.ListSystemInfoParams, _ ...systemapi.RequestEditorFn) (*systemapi.ListSystemInfoResponse, error) {
+			return okInfoResp(systemapi.SystemInfoList{
+				Items: []systemapi.SystemInfo{
 					{
 						Device:        "nas-1",
 						Model:         "DS920+",

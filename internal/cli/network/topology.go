@@ -7,7 +7,7 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	gen "github.com/bwilczynski/hlctl/internal/network"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +35,7 @@ func newTopologyCmd() *cobra.Command {
 		Short: "Show network topology",
 	}
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		params := &gen.GetNetworkTopologyParams{}
+		params := &networkapi.GetNetworkTopologyParams{}
 		if includeClients || includeWireless {
 			t := true
 			params.IncludeClients = &t
@@ -56,7 +56,7 @@ func newTopologyCmd() *cobra.Command {
 	return cmd
 }
 
-func buildTopologyTree(topo gen.NetworkTopology, includeWireless bool) (topologyTree, error) {
+func buildTopologyTree(topo networkapi.NetworkTopology, includeWireless bool) (topologyTree, error) {
 	nodeDisp := make(map[string]string)
 	var gatewayID string
 
@@ -76,7 +76,7 @@ func buildTopologyTree(topo gen.NetworkTopology, includeWireless bool) (topology
 				disp += fmt.Sprintf(" [%d clients]", *d.NumClients)
 			}
 			nodeDisp[d.Id] = disp
-			if d.Type == gen.NetworkDeviceTypeGateway {
+			if d.Type == networkapi.NetworkDeviceTypeGateway {
 				gatewayID = d.Id
 			}
 		case "client":
@@ -147,7 +147,7 @@ func buildTopologyTree(topo gen.NetworkTopology, includeWireless bool) (topology
 	}, nil
 }
 
-func connectionRefID(ref gen.NetworkConnectionRef) (string, error) {
+func connectionRefID(ref networkapi.NetworkConnectionRef) (string, error) {
 	disc, err := ref.Discriminator()
 	if err != nil {
 		return "", err

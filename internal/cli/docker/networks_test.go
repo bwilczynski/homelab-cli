@@ -9,22 +9,22 @@ import (
 	"testing"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/docker"
+	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 )
 
-func okNetworksResp(list gen.DockerNetworkList) *gen.ListDockerNetworksResponse {
+func okNetworksResp(list dockerapi.DockerNetworkList) *dockerapi.ListDockerNetworksResponse {
 	b, _ := json.Marshal(list)
-	return &gen.ListDockerNetworksResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
+	return &dockerapi.ListDockerNetworksResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
 }
 
-func okNetworkResp(detail gen.DockerNetworkDetail) *gen.GetDockerNetworkResponse {
+func okNetworkResp(detail dockerapi.DockerNetworkDetail) *dockerapi.GetDockerNetworkResponse {
 	b, _ := json.Marshal(detail)
-	return &gen.GetDockerNetworkResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
+	return &dockerapi.GetDockerNetworkResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &detail}
 }
 
 func TestListNetworksCmd_tableOutput(t *testing.T) {
-	list := gen.DockerNetworkList{
-		Items: []gen.DockerNetwork{
+	list := dockerapi.DockerNetworkList{
+		Items: []dockerapi.DockerNetwork{
 			{
 				Id:                  "nas-1.immich_default",
 				Name:                "immich_default",
@@ -34,7 +34,7 @@ func TestListNetworksCmd_tableOutput(t *testing.T) {
 		},
 	}
 	stub := &StubClient{
-		ListDockerNetworksWithResponseFunc: func(_ context.Context, _ *gen.ListDockerNetworksParams, _ ...gen.RequestEditorFn) (*gen.ListDockerNetworksResponse, error) {
+		ListDockerNetworksWithResponseFunc: func(_ context.Context, _ *dockerapi.ListDockerNetworksParams, _ ...dockerapi.RequestEditorFn) (*dockerapi.ListDockerNetworksResponse, error) {
 			return okNetworksResp(list), nil
 		},
 	}
@@ -59,7 +59,7 @@ func TestListNetworksCmd_tableOutput(t *testing.T) {
 func TestGetNetworkCmd_tableOutput(t *testing.T) {
 	subnet := "172.18.0.0/16"
 	gateway := "172.18.0.1"
-	detail := gen.DockerNetworkDetail{
+	detail := dockerapi.DockerNetworkDetail{
 		Id:                  "nas-1.immich_default",
 		Name:                "immich_default",
 		Device:              "nas-1",
@@ -70,7 +70,7 @@ func TestGetNetworkCmd_tableOutput(t *testing.T) {
 		Containers:          []string{"immich_server", "immich_redis"},
 	}
 	stub := &StubClient{
-		GetDockerNetworkWithResponseFunc: func(_ context.Context, _ string, _ ...gen.RequestEditorFn) (*gen.GetDockerNetworkResponse, error) {
+		GetDockerNetworkWithResponseFunc: func(_ context.Context, _ string, _ ...dockerapi.RequestEditorFn) (*dockerapi.GetDockerNetworkResponse, error) {
 			return okNetworkResp(detail), nil
 		},
 	}

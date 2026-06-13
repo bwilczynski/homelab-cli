@@ -12,7 +12,7 @@ build: ## Build the hlctl binary
 	go build -o $(BINARY) ./cmd/hlctl
 
 generate: bundle ## Generate client code from the bundled spec
-	@mkdir -p internal/system internal/docker internal/storage internal/network
+	@mkdir -p internal/api/system internal/api/docker internal/api/storage internal/api/network
 	$(OAPI_CODEGEN) --config codegen/system.yaml $(SPEC_FILE)
 	$(OAPI_CODEGEN) --config codegen/docker.yaml $(SPEC_FILE)
 	$(OAPI_CODEGEN) --config codegen/storage.yaml $(SPEC_FILE)

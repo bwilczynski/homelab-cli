@@ -6,7 +6,7 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	gen "github.com/bwilczynski/hlctl/internal/docker"
+	dockerapi "github.com/bwilczynski/hlctl/internal/api/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +26,7 @@ func newListContainersCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "list", Short: "List containers"}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		params := &gen.ListContainersParams{}
+		params := &dockerapi.ListContainersParams{}
 		if *device != "" {
 			params.Device = device
 		}
@@ -55,7 +55,7 @@ func newGetContainerCmd() *cobra.Command {
 func newStartContainerCmd() *cobra.Command {
 	return cmdutil.ActionCmd("start <container-id>", "Start a container", "started",
 		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
-			r, err := c.StartContainerWithResponse(ctx, id, &gen.StartContainerParams{})
+			r, err := c.StartContainerWithResponse(ctx, id, &dockerapi.StartContainerParams{})
 			if err != nil {
 				return 0, nil, err
 			}
@@ -66,7 +66,7 @@ func newStartContainerCmd() *cobra.Command {
 func newStopContainerCmd() *cobra.Command {
 	return cmdutil.ActionCmd("stop <container-id>", "Stop a container", "stopped",
 		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
-			r, err := c.StopContainerWithResponse(ctx, id, &gen.StopContainerParams{})
+			r, err := c.StopContainerWithResponse(ctx, id, &dockerapi.StopContainerParams{})
 			if err != nil {
 				return 0, nil, err
 			}
@@ -77,7 +77,7 @@ func newStopContainerCmd() *cobra.Command {
 func newRestartContainerCmd() *cobra.Command {
 	return cmdutil.ActionCmd("restart <container-id>", "Restart a container", "restarted",
 		func(c DockerClient, ctx context.Context, id string) (int, []byte, error) {
-			r, err := c.RestartContainerWithResponse(ctx, id, &gen.RestartContainerParams{})
+			r, err := c.RestartContainerWithResponse(ctx, id, &dockerapi.RestartContainerParams{})
 			if err != nil {
 				return 0, nil, err
 			}

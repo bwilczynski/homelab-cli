@@ -10,29 +10,29 @@ import (
 	"time"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
-	gen "github.com/bwilczynski/hlctl/internal/system"
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 )
 
-func okHealthResp(data gen.Health) *gen.GetSystemHealthResponse {
+func okHealthResp(data systemapi.Health) *systemapi.GetSystemHealthResponse {
 	b, _ := json.Marshal(data)
-	return &gen.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
+	return &systemapi.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
 }
 
-func errHealthResp(status int, body map[string]any) *gen.GetSystemHealthResponse {
+func errHealthResp(status int, body map[string]any) *systemapi.GetSystemHealthResponse {
 	b, _ := json.Marshal(body)
-	return &gen.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
+	return &systemapi.GetSystemHealthResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
 }
 
 func TestHealthCmd_tableOutput(t *testing.T) {
 	msg := "disk failing"
 	stub := &StubClient{
-		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.GetSystemHealthResponse, error) {
-			return okHealthResp(gen.Health{
-				Status:    gen.Healthy,
+		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...systemapi.RequestEditorFn) (*systemapi.GetSystemHealthResponse, error) {
+			return okHealthResp(systemapi.Health{
+				Status:    systemapi.Healthy,
 				CheckedAt: time.Now(),
-				Components: []gen.ComponentHealth{
-					{Name: "nas-1", Status: gen.Healthy},
-					{Name: "unifi", Status: gen.Degraded, Message: &msg},
+				Components: []systemapi.ComponentHealth{
+					{Name: "nas-1", Status: systemapi.Healthy},
+					{Name: "unifi", Status: systemapi.Degraded, Message: &msg},
 				},
 			}), nil
 		},
@@ -57,7 +57,7 @@ func TestHealthCmd_tableOutput(t *testing.T) {
 
 func TestHealthCmd_apiError(t *testing.T) {
 	stub := &StubClient{
-		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...gen.RequestEditorFn) (*gen.GetSystemHealthResponse, error) {
+		GetSystemHealthWithResponseFunc: func(_ context.Context, _ ...systemapi.RequestEditorFn) (*systemapi.GetSystemHealthResponse, error) {
 			return errHealthResp(http.StatusUnauthorized, map[string]any{
 				"type":   "https://homelab.local/problems/unauthorized",
 				"title":  "Unauthorized",

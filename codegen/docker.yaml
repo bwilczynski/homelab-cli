@@ -2,7 +2,7 @@ package: docker
 generate:
   client: true
   models: true
-output: internal/docker/api.gen.go
+output: internal/api/docker/api.gen.go
 output-options:
   include-tags:
     - docker

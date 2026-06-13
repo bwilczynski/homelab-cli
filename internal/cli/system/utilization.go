@@ -7,7 +7,7 @@ import (
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/watch"
-	gen "github.com/bwilczynski/hlctl/internal/system"
+	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,7 @@ func newUtilizationCmd() *cobra.Command {
 	}
 	device := cmdutil.DeviceFlag(cmd)
 	cmd.RunE = watch.Wrap(func(ctx context.Context, w io.Writer) error {
-		params := &gen.ListSystemUtilizationParams{}
+		params := &systemapi.ListSystemUtilizationParams{}
 		if *device != "" {
 			params.Device = device
 		}
