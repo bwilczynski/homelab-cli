@@ -13,7 +13,7 @@ The release workflow (`release.yml`) computes a tag with a shell one-liner:
 ```sh
 TAG="v$(date +%Y%m%d).$(git rev-parse --short=4 HEAD)"
 ```
-This tag is pushed to GitHub, then GoReleaser picks it up via `{{.Version}}` to build binaries, create a GitHub release, and update the Homebrew tap. GoReleaser runs with `--skip=validate` because the tag doesn't yet exist when GoReleaser starts.
+This tag is pushed to GitHub, then GoReleaser picks it up via `{{.Version}}` to build binaries, create a GitHub release, and update the Homebrew tap. GoReleaser runs with `--skip=validate` because CalVer tags like `v20260614.6da0` are not valid SemVer and GoReleaser's validation rejects them.
 
 ## Target state
 
