@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 'lts/*'
 
       - uses: actions/setup-go@v5
         with:
@@ -43,7 +43,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 'lts/*'
 
       - uses: actions/setup-go@v5
         with:
@@ -52,18 +52,17 @@ jobs:
       - name: Generate API client code
         run: make generate
 
-      - name: Compute and push tag
-        run: |
-          TAG="v$(date +%Y%m%d).$(git rev-parse --short=4 HEAD)"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG" || true
-          git push origin "$TAG" || true
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v6
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: goreleaser/goreleaser-action@v6
+        if: steps.semantic.outputs.new_release_published == 'true'
         with:
           version: latest
-          args: release --clean --skip=validate
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
