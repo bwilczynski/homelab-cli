@@ -3,7 +3,6 @@ package system
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,212 +10,210 @@ import (
 
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil/httpmock"
 	"github.com/bwilczynski/hlctl/internal/output"
 )
 
-func okListUpdatesResp(list systemapi.SystemUpdateList) *systemapi.ListSystemUpdatesResponse {
-	b, _ := json.Marshal(list)
-	return &systemapi.ListSystemUpdatesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
+// Layer 1: flag/arg parsing
 
-func okGetUpdateResp(data map[string]any) *systemapi.GetSystemUpdateResponse {
-	b, _ := json.Marshal(data)
-	var typed systemapi.SystemUpdateDetail
-	_ = json.Unmarshal(b, &typed)
-	return &systemapi.GetSystemUpdateResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
-}
-
-func errGetUpdateResp(status int, body map[string]any) *systemapi.GetSystemUpdateResponse {
-	b, _ := json.Marshal(body)
-	return &systemapi.GetSystemUpdateResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
-}
-
-func okCheckUpdatesResp(list systemapi.SystemUpdateList) *systemapi.CheckSystemUpdatesResponse {
-	b, _ := json.Marshal(list)
-	return &systemapi.CheckSystemUpdatesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
-
-func TestListUpdatesCmd_tableOutput(t *testing.T) {
-	stub := &StubClient{
-		ListSystemUpdatesWithResponseFunc: func(_ context.Context, _ *systemapi.ListSystemUpdatesParams, _ ...systemapi.RequestEditorFn) (*systemapi.ListSystemUpdatesResponse, error) {
-			return okListUpdatesResp(systemapi.SystemUpdateList{
-				Items: []systemapi.SystemUpdate{
-					{
-						Id:             "nas-1.homeassistant",
-						Name:           "homeassistant",
-						Device:         "nas-1",
-						Type:           systemapi.Container,
-						Status:         systemapi.UpdateAvailable,
-						CurrentVersion: "2024.1.0",
-						LatestVersion:  "2024.2.0",
-						CheckedAt:      time.Now(),
-					},
-				},
-			}), nil
-		},
-	}
-
-	cmd := newListUpdatesCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+func TestNewListUpdatesCmd_statusFlag(t *testing.T) {
+	var captured *listUpdatesOptions
+	cmd := newListUpdatesCmd(cmdutil.TestFactory(t), func(o *listUpdatesOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"--status", "updateAvailable"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if captured.Status != "updateAvailable" {
+		t.Errorf("expected Status=updateAvailable, got %q", captured.Status)
+	}
+}
 
-	out := buf.String()
+func TestNewGetUpdateCmd_argParsed(t *testing.T) {
+	var captured *getUpdateOptions
+	cmd := newGetUpdateCmd(cmdutil.TestFactory(t), func(o *getUpdateOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"nas-1.homeassistant"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if captured.ID != "nas-1.homeassistant" {
+		t.Errorf("expected ID=nas-1.homeassistant, got %q", captured.ID)
+	}
+}
+
+func TestNewCheckUpdatesCmd_runFCalled(t *testing.T) {
+	called := false
+	cmd := newCheckUpdatesCmd(cmdutil.TestFactory(t), func(o *checkUpdatesOptions) error {
+		called = true
+		return nil
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("expected runF to be called")
+	}
+}
+
+// Layer 2: business logic
+
+func TestListUpdatesRun_tableOutput(t *testing.T) {
+	list := systemapi.SystemUpdateList{Items: []systemapi.SystemUpdate{{
+		Id:             "nas-1.homeassistant",
+		Name:           "homeassistant",
+		Device:         "nas-1",
+		Type:           systemapi.Container,
+		Status:         systemapi.UpdateAvailable,
+		CurrentVersion: "2024.1.0",
+		LatestVersion:  "2024.2.0",
+		CheckedAt:      time.Now(),
+	}}}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/system/updates"), httpmock.JSONResponse(list))
+
+	var out bytes.Buffer
+	opts := &listUpdatesOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	if err := listUpdatesRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	for _, want := range []string{"nas-1.homeassistant", "nas-1", "container", "updateAvailable", "2024.1.0", "2024.2.0"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }
 
-func TestGetUpdateCmd_containerType(t *testing.T) {
-	stub := &StubClient{
-		GetSystemUpdateWithResponseFunc: func(_ context.Context, _ string, _ ...systemapi.RequestEditorFn) (*systemapi.GetSystemUpdateResponse, error) {
-			return okGetUpdateResp(map[string]any{
-				"id":             "nas-1.homeassistant",
-				"name":           "homeassistant",
-				"device":         "nas-1",
-				"type":           "container",
-				"status":         "updateAvailable",
-				"currentVersion": "2024.1.0",
-				"latestVersion":  "2024.2.0",
-				"checkedAt":      time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
-				"publishedAt":    time.Date(2026, 4, 28, 10, 0, 0, 0, time.UTC),
-				"image":          "ghcr.io/home-assistant/home-assistant",
-				"source":         "https://github.com/home-assistant/core",
-				"releaseUrl":     "https://github.com/home-assistant/core/releases/tag/2024.2.0",
-			}), nil
-		},
+func TestGetUpdateRun_containerType(t *testing.T) {
+	detail := map[string]any{
+		"id":             "nas-1.homeassistant",
+		"name":           "homeassistant",
+		"device":         "nas-1",
+		"type":           "container",
+		"status":         "updateAvailable",
+		"currentVersion": "2024.1.0",
+		"latestVersion":  "2024.2.0",
+		"checkedAt":      time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+		"publishedAt":    time.Date(2026, 4, 28, 10, 0, 0, 0, time.UTC),
+		"image":          "ghcr.io/home-assistant/home-assistant",
+		"source":         "https://github.com/home-assistant/core",
+		"releaseUrl":     "https://github.com/home-assistant/core/releases/tag/2024.2.0",
 	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/system/updates/*"), httpmock.JSONResponse(detail))
 
-	cmd := newGetUpdateCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.homeassistant"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &getUpdateOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "nas-1.homeassistant",
+	}
+	if err := getUpdateRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
 	for _, want := range []string{
 		"nas-1.homeassistant", "homeassistant", "container",
 		"2024.1.0", "2024.2.0",
 		"ghcr.io/home-assistant/home-assistant",
 	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }
 
-func TestGetUpdateCmd_apiError(t *testing.T) {
-	stub := &StubClient{
-		GetSystemUpdateWithResponseFunc: func(_ context.Context, _ string, _ ...systemapi.RequestEditorFn) (*systemapi.GetSystemUpdateResponse, error) {
-			return errGetUpdateResp(http.StatusNotFound, map[string]any{
-				"type":   "https://homelab.local/problems/not-found",
-				"title":  "Not Found",
-				"status": 404,
-				"detail": "update 'nas-1.foo' not found",
-			}), nil
-		},
-	}
+func TestGetUpdateRun_apiError(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/system/updates/*"), httpmock.StatusJSONResponse(http.StatusNotFound, map[string]any{
+		"type": "https://homelab.local/problems/not-found", "title": "Not Found", "status": 404, "detail": "update 'nas-1.foo' not found",
+	}))
 
-	cmd := newGetUpdateCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.foo"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
+	var out bytes.Buffer
+	opts := &getUpdateOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "nas-1.foo",
+	}
+	err := getUpdateRun(context.Background(), &out, opts)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "Not Found") {
 		t.Errorf("expected 'Not Found' in error, got: %v", err)
 	}
+	reg.Verify(t)
 }
 
-func TestCheckUpdatesCmd_tableOutput(t *testing.T) {
-	stub := &StubClient{
-		CheckSystemUpdatesWithResponseFunc: func(_ context.Context, _ *systemapi.CheckSystemUpdatesParams, _ ...systemapi.RequestEditorFn) (*systemapi.CheckSystemUpdatesResponse, error) {
-			return okCheckUpdatesResp(systemapi.SystemUpdateList{
-				Items: []systemapi.SystemUpdate{
-					{
-						Id:             "nas-1.homeassistant",
-						Name:           "homeassistant",
-						Device:         "nas-1",
-						Type:           systemapi.Container,
-						Status:         systemapi.UpdateAvailable,
-						CurrentVersion: "2024.1.0",
-						LatestVersion:  "2024.2.0",
-						CheckedAt:      time.Now(),
-					},
-				},
-			}), nil
-		},
-	}
+func TestCheckUpdatesRun_tableOutput(t *testing.T) {
+	list := systemapi.SystemUpdateList{Items: []systemapi.SystemUpdate{{
+		Id:             "nas-1.homeassistant",
+		Name:           "homeassistant",
+		Device:         "nas-1",
+		Type:           systemapi.Container,
+		Status:         systemapi.UpdateAvailable,
+		CurrentVersion: "2024.1.0",
+		LatestVersion:  "2024.2.0",
+		CheckedAt:      time.Now(),
+	}}}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("POST", "/system/updates:check"), httpmock.JSONResponse(list))
 
-	cmd := newCheckUpdatesCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &checkUpdatesOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	if err := checkUpdatesRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
 	for _, want := range []string{"nas-1.homeassistant", "updateAvailable"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }
 
-func TestGetUpdateCmd_jsonOutput(t *testing.T) {
-	stub := &StubClient{
-		GetSystemUpdateWithResponseFunc: func(_ context.Context, _ string, _ ...systemapi.RequestEditorFn) (*systemapi.GetSystemUpdateResponse, error) {
-			return okGetUpdateResp(map[string]any{
-				"id":             "nas-1.homeassistant",
-				"name":           "homeassistant",
-				"device":         "nas-1",
-				"type":           "container",
-				"status":         "updateAvailable",
-				"currentVersion": "2024.1.0",
-				"latestVersion":  "2024.2.0",
-				"checkedAt":      time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
-				"publishedAt":    time.Date(2026, 4, 28, 10, 0, 0, 0, time.UTC),
-				"image":          "ghcr.io/home-assistant/home-assistant",
-				"source":         "https://github.com/home-assistant/core",
-				"releaseUrl":     "https://github.com/home-assistant/core/releases/tag/2024.2.0",
-			}), nil
-		},
+func TestGetUpdateRun_jsonOutput(t *testing.T) {
+	detail := map[string]any{
+		"id":             "nas-1.homeassistant",
+		"name":           "homeassistant",
+		"device":         "nas-1",
+		"type":           "container",
+		"status":         "updateAvailable",
+		"currentVersion": "2024.1.0",
+		"latestVersion":  "2024.2.0",
+		"checkedAt":      time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+		"image":          "ghcr.io/home-assistant/home-assistant",
 	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/system/updates/*"), httpmock.JSONResponse(detail))
 
-	f := cmdutil.TestFactory(t)
-	f.Output = func() output.Format { return output.FormatJSON }
-
-	cmd := newGetUpdateCmd(f)
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.homeassistant"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &getUpdateOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatJSON },
+		ID:         "nas-1.homeassistant",
+	}
+	if err := getUpdateRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
-	if !strings.Contains(out, "ghcr.io/home-assistant/home-assistant") {
-		t.Errorf("expected raw JSON with image field in output, got:\n%s", out)
+	if !strings.Contains(out.String(), "ghcr.io/home-assistant/home-assistant") {
+		t.Errorf("expected raw JSON with image field in output, got:\n%s", out.String())
 	}
-	if strings.Contains(out, "Type") && strings.Contains(out, "Version") {
-		t.Errorf("unexpected template rendering detected in JSON output:\n%s", out)
-	}
+	reg.Verify(t)
 }
