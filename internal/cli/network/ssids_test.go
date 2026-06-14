@@ -3,119 +3,40 @@ package network
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 
-	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil/httpmock"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
-func okSsidsResp(list networkapi.SsidList) *networkapi.ListSsidsResponse {
-	b, _ := json.Marshal(list)
-	return &networkapi.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
+// Layer 1: runF hook
 
-func errSsidsResp(status int, body map[string]any) *networkapi.ListSsidsResponse {
-	b, _ := json.Marshal(body)
-	return &networkapi.ListSsidsResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
-}
-
-func okSsidResp(data map[string]any) *networkapi.GetSsidResponse {
-	b, _ := json.Marshal(data)
-	var typed networkapi.SsidDetail
-	_ = json.Unmarshal(b, &typed)
-	return &networkapi.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &typed}
-}
-
-func errSsidResp(status int, body map[string]any) *networkapi.GetSsidResponse {
-	b, _ := json.Marshal(body)
-	return &networkapi.GetSsidResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
-}
-
-func TestListSsidsCmd_tableOutput(t *testing.T) {
-	stub := &StubClient{
-		ListSsidsWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListSsidsResponse, error) {
-			return okSsidsResp(networkapi.SsidList{
-				Items: []networkapi.Ssid{
-					{
-						Id: "unifi.home", Name: "Home", VlanId: 1,
-						Bands:      []networkapi.WifiBand{networkapi.WifiBandBand2g, networkapi.WifiBandBand5g, networkapi.WifiBandBand6g},
-						NumClients: 12,
-					},
-					{
-						Id: "unifi.iot", Name: "IoT", VlanId: 20,
-						Bands:      []networkapi.WifiBand{networkapi.WifiBandBand2g, networkapi.WifiBandBand5g},
-						NumClients: 8,
-					},
-				},
-			}), nil
-		},
-	}
-	f := cmdutil.TestFactory(t)
-	cmd := newListSsidsCmd(f)
-	cmdutil.SetClient[NetworkClient](cmd, stub)
+func TestNewListSsidsCmd_runFCalled(t *testing.T) {
+	called := false
+	cmd := newListSsidsCmd(cmdutil.TestFactory(t), func(o *listSsidsOptions) error {
+		called = true
+		return nil
+	})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	out := buf.String()
-	for _, want := range []string{"unifi.home", "Home", "unifi.iot", "IoT", "2.4 GHz", "5 GHz", "6 GHz", "12", "8"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
-		}
+	if !called {
+		t.Error("expected runF to be called")
 	}
 }
 
-func TestListSsidsCmd_apiError(t *testing.T) {
-	stub := &StubClient{
-		ListSsidsWithResponseFunc: func(_ context.Context, _ ...networkapi.RequestEditorFn) (*networkapi.ListSsidsResponse, error) {
-			return errSsidsResp(http.StatusUnauthorized, map[string]any{
-				"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
-				"status": 401, "detail": "Bearer token missing",
-			}), nil
-		},
-	}
-	f := cmdutil.TestFactory(t)
-	cmd := newListSsidsCmd(f)
-	cmdutil.SetClient[NetworkClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "Unauthorized") {
-		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
-	}
-}
-
-func TestGetSsidCmd_withClients(t *testing.T) {
-	stub := &StubClient{
-		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetSsidResponse, error) {
-			return okSsidResp(map[string]any{
-				"id": "unifi.iot", "uri": "/network/ssids/unifi.iot",
-				"name": "IoT", "vlanId": 20,
-				"bands":            []string{"band2g", "band5g"},
-				"numClients":       2,
-				"securityProtocol": "wpa2",
-				"clients": []map[string]any{
-					{"kind": "client", "id": "unifi.sonos", "uri": "/network/clients/unifi.sonos", "name": "Sonos One SL"},
-					{"kind": "client", "id": "unifi.hue", "uri": "/network/clients/unifi.hue", "name": "Philips Hue Bridge"},
-				},
-				"broadcastingAps": []map[string]any{
-					{"kind": "device", "id": "unifi.ap-lr", "uri": "/network/devices/unifi.ap-lr", "name": "AP Living Room"},
-				},
-			}), nil
-		},
-	}
-	f := cmdutil.TestFactory(t)
-	cmd := newGetSsidCmd(f)
-	cmdutil.SetClient[NetworkClient](cmd, stub)
+func TestNewGetSsidCmd_argParsed(t *testing.T) {
+	var captured *getSsidOptions
+	cmd := newGetSsidCmd(cmdutil.TestFactory(t), func(o *getSsidOptions) error {
+		captured = o
+		return nil
+	})
 	cmd.SetArgs([]string{"unifi.iot"})
 	buf := &bytes.Buffer{}
 	cmd.SetOut(buf)
@@ -123,35 +44,130 @@ func TestGetSsidCmd_withClients(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	out := buf.String()
-	for _, want := range []string{"unifi.iot", "IoT", "20", "wpa2", "Sonos One SL", "Philips Hue Bridge", "AP Living Room", "CLIENTS", "BROADCASTING APs"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
-		}
+	if captured == nil {
+		t.Fatal("expected runF to be called")
+	}
+	if captured.ID != "unifi.iot" {
+		t.Errorf("expected ID=unifi.iot, got %q", captured.ID)
 	}
 }
 
-func TestGetSsidCmd_notFound(t *testing.T) {
-	stub := &StubClient{
-		GetSsidWithResponseFunc: func(_ context.Context, _ string, _ ...networkapi.RequestEditorFn) (*networkapi.GetSsidResponse, error) {
-			return errSsidResp(http.StatusNotFound, map[string]any{
-				"type": "https://homelab.local/problems/not-found", "title": "Not Found",
-				"status": 404, "detail": "ssid not found",
-			}), nil
+// Layer 2: business logic via httpmock
+
+func TestListSsidsRun_tableOutput(t *testing.T) {
+	fixture := map[string]any{
+		"items": []any{
+			map[string]any{
+				"id": "unifi.home", "name": "Home", "vlanId": 1,
+				"bands":      []string{"band2g", "band5g", "band6g"},
+				"numClients": 12,
+			},
+			map[string]any{
+				"id": "unifi.iot", "name": "IoT", "vlanId": 20,
+				"bands":      []string{"band2g", "band5g"},
+				"numClients": 8,
+			},
 		},
 	}
-	f := cmdutil.TestFactory(t)
-	cmd := newGetSsidCmd(f)
-	cmdutil.SetClient[NetworkClient](cmd, stub)
-	cmd.SetArgs([]string{"unifi.nonexistent"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/network/ssids"), httpmock.JSONResponse(fixture))
+
+	var out bytes.Buffer
+	opts := &listSsidsOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	if err := listSsidsRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"unifi.home", "Home", "unifi.iot", "IoT", "2.4 GHz", "5 GHz", "6 GHz", "12", "8"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
+		}
+	}
+	reg.Verify(t)
+}
+
+func TestListSsidsRun_apiError(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/network/ssids"), httpmock.StatusJSONResponse(http.StatusUnauthorized, map[string]any{
+		"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized",
+		"status": 401, "detail": "Bearer token missing",
+	}))
+
+	var out bytes.Buffer
+	opts := &listSsidsOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	err := listSsidsRun(context.Background(), &out, opts)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Unauthorized") {
+		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
+	}
+	reg.Verify(t)
+}
+
+func TestGetSsidRun_withClients(t *testing.T) {
+	fixture := map[string]any{
+		"id": "unifi.iot", "uri": "/network/ssids/unifi.iot",
+		"name": "IoT", "vlanId": 20,
+		"bands":            []string{"band2g", "band5g"},
+		"numClients":       2,
+		"securityProtocol": "wpa2",
+		"clients": []map[string]any{
+			{"kind": "client", "id": "unifi.sonos", "uri": "/network/clients/unifi.sonos", "name": "Sonos One SL"},
+			{"kind": "client", "id": "unifi.hue", "uri": "/network/clients/unifi.hue", "name": "Philips Hue Bridge"},
+		},
+		"broadcastingAps": []map[string]any{
+			{"kind": "device", "id": "unifi.ap-lr", "uri": "/network/devices/unifi.ap-lr", "name": "AP Living Room"},
+		},
+	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/network/ssids/*"), httpmock.JSONResponse(fixture))
+
+	var out bytes.Buffer
+	opts := &getSsidOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "unifi.iot",
+	}
+	if err := getSsidRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"unifi.iot", "IoT", "20", "wpa2", "Sonos One SL", "Philips Hue Bridge", "AP Living Room", "CLIENTS", "BROADCASTING APs"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
+		}
+	}
+	reg.Verify(t)
+}
+
+func TestGetSsidRun_notFound(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/network/ssids/*"), httpmock.StatusJSONResponse(http.StatusNotFound, map[string]any{
+		"type": "https://homelab.local/problems/not-found", "title": "Not Found",
+		"status": 404, "detail": "ssid not found",
+	}))
+
+	var out bytes.Buffer
+	opts := &getSsidOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "unifi.nonexistent",
+	}
+	err := getSsidRun(context.Background(), &out, opts)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "Not Found") {
 		t.Errorf("expected 'Not Found' in error, got: %v", err)
 	}
+	reg.Verify(t)
 }

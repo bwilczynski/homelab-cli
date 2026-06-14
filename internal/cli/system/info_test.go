@@ -3,50 +3,58 @@ package system
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"net/http"
 	"strings"
 	"testing"
 
 	systemapi "github.com/bwilczynski/hlctl/internal/api/system"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil/httpmock"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
-func okInfoResp(list systemapi.SystemInfoList) *systemapi.ListSystemInfoResponse {
-	b, _ := json.Marshal(list)
-	return &systemapi.ListSystemInfoResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
+// Layer 1: flag parsing
 
-func TestInfoCmd_tableOutput(t *testing.T) {
-	stub := &StubClient{
-		ListSystemInfoWithResponseFunc: func(_ context.Context, _ *systemapi.ListSystemInfoParams, _ ...systemapi.RequestEditorFn) (*systemapi.ListSystemInfoResponse, error) {
-			return okInfoResp(systemapi.SystemInfoList{
-				Items: []systemapi.SystemInfo{
-					{
-						Device:        "nas-1",
-						Model:         "DS920+",
-						Firmware:      "7.2.1-69057",
-						RamMb:         4096,
-						UptimeSeconds: 3_931_200,
-					},
-				},
-			}), nil
-		},
-	}
-
-	cmd := newInfoCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[SystemClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+func TestNewInfoCmd_deviceFlag(t *testing.T) {
+	var captured *listInfoOptions
+	cmd := newInfoCmd(cmdutil.TestFactory(t), func(o *listInfoOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"--device", "nas-1"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if captured.Device != "nas-1" {
+		t.Errorf("expected Device=nas-1, got %q", captured.Device)
+	}
+}
 
-	out := buf.String()
+// Layer 2: business logic
+
+func TestListInfoRun_tableOutput(t *testing.T) {
+	info := systemapi.SystemInfoList{Items: []systemapi.SystemInfo{{
+		Device:        "nas-1",
+		Model:         "DS920+",
+		Firmware:      "7.2.1-69057",
+		RamMb:         4096,
+		UptimeSeconds: 3_931_200,
+	}}}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/system/info"), httpmock.JSONResponse(info))
+
+	var out bytes.Buffer
+	opts := &listInfoOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	if err := listInfoRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	for _, want := range []string{"nas-1", "DS920+", "7.2.1-69057", "4.0 GB"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }

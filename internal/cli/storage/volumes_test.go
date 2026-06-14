@@ -3,94 +3,112 @@ package storage
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 
 	storageapi "github.com/bwilczynski/hlctl/internal/api/storage"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
+	"github.com/bwilczynski/hlctl/internal/cli/cmdutil/httpmock"
+	"github.com/bwilczynski/hlctl/internal/output"
 )
 
-func okVolumesResp(list storageapi.VolumeList) *storageapi.ListStorageVolumesResponse {
-	b, _ := json.Marshal(list)
-	return &storageapi.ListStorageVolumesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &list}
-}
-
-func errVolumesResp(status int, body map[string]any) *storageapi.ListStorageVolumesResponse {
-	b, _ := json.Marshal(body)
-	return &storageapi.ListStorageVolumesResponse{HTTPResponse: &http.Response{StatusCode: status}, Body: b}
-}
-
-func okVolumeResp(data storageapi.VolumeDetail) *storageapi.GetStorageVolumeResponse {
-	b, _ := json.Marshal(data)
-	return &storageapi.GetStorageVolumeResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, Body: b, JSON200: &data}
-}
-
-func TestListVolumesCmd_tableOutput(t *testing.T) {
-	list := storageapi.VolumeList{
-		Items: []storageapi.Volume{
-			{
-				Id:         "nas-1.volume1",
-				Name:       "volume1",
-				Device:     "nas-1",
-				RaidType:   "SHR-2",
-				Status:     storageapi.Normal,
-				TotalBytes: 15_981_977_067_520,
-				UsedBytes:  10_132_536_762_777,
-				FileSystem: "ext4",
-			},
-		},
+func testHTTPClient(reg *httpmock.Registry) func() (*http.Client, string, error) {
+	return func() (*http.Client, string, error) {
+		return &http.Client{Transport: reg}, "http://localhost", nil
 	}
-	stub := &StubClient{
-		ListStorageVolumesWithResponseFunc: func(_ context.Context, _ *storageapi.ListStorageVolumesParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListStorageVolumesResponse, error) {
-			return okVolumesResp(list), nil
-		},
-	}
+}
 
-	cmd := newListVolumesCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+// Layer 1: flag/arg parsing
+
+func TestNewListVolumesCmd_deviceFlag(t *testing.T) {
+	var captured *listVolumesOptions
+	cmd := newListVolumesCmd(cmdutil.TestFactory(t), func(o *listVolumesOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"--device", "nas-1"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
-	for _, want := range []string{"nas-1.volume1", "nas-1", "SHR-2", "normal"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
-		}
+	if captured.Device != "nas-1" {
+		t.Errorf("expected Device=nas-1, got %q", captured.Device)
 	}
 }
 
-func TestListVolumesCmd_apiError(t *testing.T) {
-	stub := &StubClient{
-		ListStorageVolumesWithResponseFunc: func(_ context.Context, _ *storageapi.ListStorageVolumesParams, _ ...storageapi.RequestEditorFn) (*storageapi.ListStorageVolumesResponse, error) {
-			return errVolumesResp(http.StatusUnauthorized, map[string]any{
-				"type":   "https://homelab.local/problems/unauthorized",
-				"title":  "Unauthorized",
-				"status": 401,
-				"detail": "Bearer token missing",
-			}), nil
-		},
+func TestNewGetVolumeCmd_argParsed(t *testing.T) {
+	var captured *getVolumeOptions
+	cmd := newGetVolumeCmd(cmdutil.TestFactory(t), func(o *getVolumeOptions) error {
+		captured = o
+		return nil
+	})
+	cmd.SetArgs([]string{"nas-1.volume1"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	cmd := newListVolumesCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	err := cmd.Execute()
+	if captured.ID != "nas-1.volume1" {
+		t.Errorf("expected ID=nas-1.volume1, got %q", captured.ID)
+	}
+}
+
+// Layer 2: business logic
+
+func TestListVolumesRun_tableOutput(t *testing.T) {
+	list := storageapi.VolumeList{Items: []storageapi.Volume{{
+		Id:         "nas-1.volume1",
+		Name:       "volume1",
+		Device:     "nas-1",
+		RaidType:   "SHR-2",
+		Status:     storageapi.Normal,
+		TotalBytes: 15_981_977_067_520,
+		UsedBytes:  10_132_536_762_777,
+		FileSystem: "ext4",
+	}}}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/storage/volumes"), httpmock.JSONResponse(list))
+
+	var out bytes.Buffer
+	opts := &listVolumesOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	if err := listVolumesRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, want := range []string{"nas-1.volume1", "nas-1", "SHR-2", "normal"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
+		}
+	}
+	reg.Verify(t)
+}
+
+func TestListVolumesRun_apiError(t *testing.T) {
+	reg := httpmock.NewRegistry()
+	reg.Register(
+		httpmock.REST("GET", "/storage/volumes"),
+		httpmock.StatusJSONResponse(http.StatusUnauthorized, map[string]any{
+			"type": "https://homelab.local/problems/unauthorized", "title": "Unauthorized", "status": 401, "detail": "Bearer token missing",
+		}),
+	)
+	var out bytes.Buffer
+	opts := &listVolumesOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+	}
+	err := listVolumesRun(context.Background(), &out, opts)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "Unauthorized") {
 		t.Errorf("expected 'Unauthorized' in error, got: %v", err)
 	}
+	reg.Verify(t)
 }
 
-func TestGetVolumeCmd_tableOutput(t *testing.T) {
+func TestGetVolumeRun_tableOutput(t *testing.T) {
 	detail := storageapi.VolumeDetail{
 		Id:         "nas-1.volume1",
 		Name:       "volume1",
@@ -103,26 +121,23 @@ func TestGetVolumeCmd_tableOutput(t *testing.T) {
 		TotalBytes: 15_981_977_067_520,
 		UsedBytes:  10_132_536_762_777,
 	}
-	stub := &StubClient{
-		GetStorageVolumeWithResponseFunc: func(_ context.Context, _ string, _ ...storageapi.RequestEditorFn) (*storageapi.GetStorageVolumeResponse, error) {
-			return okVolumeResp(detail), nil
-		},
-	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/storage/volumes/*"), httpmock.JSONResponse(detail))
 
-	cmd := newGetVolumeCmd(cmdutil.TestFactory(t))
-	cmdutil.SetClient[StorageClient](cmd, stub)
-	cmd.SetArgs([]string{"nas-1.volume1"})
-	buf := &bytes.Buffer{}
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	if err := cmd.Execute(); err != nil {
+	var out bytes.Buffer
+	opts := &getVolumeOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "nas-1.volume1",
+	}
+	if err := getVolumeRun(context.Background(), &out, opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	out := buf.String()
 	for _, want := range []string{"nas-1.volume1", "volume1", "SHR-2", "/volume1"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("expected %q in output, got:\n%s", want, out)
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
+	reg.Verify(t)
 }

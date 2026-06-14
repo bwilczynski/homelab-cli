@@ -13,8 +13,8 @@ import (
 
 // TestFactory builds a Factory suitable for cobra leaf tests. The Config and
 // HTTPClient closures return errors so any test that accidentally triggers
-// real I/O fails loudly — tests that drive a stub via SetClient[C] never
-// reach these closures.
+// real I/O fails loudly — leaf tests use the runF hook and never reach these
+// closures.
 //
 // Tests that need JSON output mode override the Output field directly:
 //

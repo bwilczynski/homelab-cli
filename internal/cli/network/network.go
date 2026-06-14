@@ -10,18 +10,6 @@ func NewCmd(f *cmdutil.Factory) *cobra.Command {
 		Use:   "network",
 		Short: "Network devices and clients",
 	}
-	cmdutil.InjectClient(cmd, func() (NetworkClient, error) {
-		httpClient, apiURL, err := f.HTTPClient()
-		if err != nil {
-			return nil, err
-		}
-		return NewNetworkClient(httpClient, apiURL)
-	})
-	cmd.AddCommand(newDevicesCmd(f))
-	cmd.AddCommand(newClientsCmd(f))
-	cmd.AddCommand(newTopologyCmd(f))
-	cmd.AddCommand(newVlansCmd(f))
-	cmd.AddCommand(newSsidsCmd(f))
-	cmd.AddCommand(newWansCmd(f))
+	cmd.AddCommand(newDevicesCmd(f), newClientsCmd(f), newTopologyCmd(f, nil), newVlansCmd(f), newSsidsCmd(f), newWansCmd(f))
 	return cmd
 }
