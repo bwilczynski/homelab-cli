@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
@@ -26,34 +27,53 @@ type topologyEdge struct {
 	EdgeDisp string
 }
 
-func newTopologyCmd(f *cmdutil.Factory) *cobra.Command {
-	var includeClients bool
-	var includeWireless bool
+type getTopologyOptions struct {
+	HTTPClient      func() (*http.Client, string, error)
+	IO              *cmdutil.IOStreams
+	Output          func() output.Format
+	IncludeClients  bool
+	IncludeWireless bool
+}
 
+func newTopologyCmd(f *cmdutil.Factory, runF func(*getTopologyOptions) error) *cobra.Command {
+	opts := &getTopologyOptions{HTTPClient: f.HTTPClient, IO: f.IOStreams, Output: f.Output}
 	cmd := &cobra.Command{
 		Use:   "topology",
 		Short: "Show network topology",
 	}
 	cmd.RunE = watch.Wrap(f.Output, func(ctx context.Context, w io.Writer) error {
-		params := &networkapi.GetNetworkTopologyParams{}
-		if includeClients || includeWireless {
-			t := true
-			params.IncludeClients = &t
+		if runF != nil {
+			return runF(opts)
 		}
-
-		resp, err := cmdutil.Client[NetworkClient](cmd).GetNetworkTopologyWithResponse(ctx, params)
-		if err != nil {
-			return err
-		}
-		return topologyView.RenderWith(w, f.Output(), resp.StatusCode(), resp.Body, func() (any, error) {
-			return buildTopologyTree(*resp.JSON200, includeWireless)
-		})
+		return getTopologyRun(ctx, w, opts)
 	})
-
-	cmd.Flags().BoolVar(&includeClients, "include-clients", false, "Include wired clients in the topology")
-	cmd.Flags().BoolVar(&includeWireless, "include-wireless", false, "Also include wireless clients (implies --include-clients)")
+	cmd.Flags().BoolVar(&opts.IncludeClients, "include-clients", false, "Include wired clients in the topology")
+	cmd.Flags().BoolVar(&opts.IncludeWireless, "include-wireless", false, "Also include wireless clients (implies --include-clients)")
 	watch.RegisterFlags(cmd)
 	return cmd
+}
+
+func getTopologyRun(ctx context.Context, w io.Writer, opts *getTopologyOptions) error {
+	httpClient, apiURL, err := opts.HTTPClient()
+	if err != nil {
+		return err
+	}
+	c, err := NewNetworkClient(httpClient, apiURL)
+	if err != nil {
+		return err
+	}
+	params := &networkapi.GetNetworkTopologyParams{}
+	if opts.IncludeClients || opts.IncludeWireless {
+		t := true
+		params.IncludeClients = &t
+	}
+	resp, err := c.GetNetworkTopologyWithResponse(ctx, params)
+	if err != nil {
+		return err
+	}
+	return topologyView.RenderWith(w, opts.Output(), resp.StatusCode(), resp.Body, func() (any, error) {
+		return buildTopologyTree(*resp.JSON200, opts.IncludeWireless)
+	})
 }
 
 func buildTopologyTree(topo networkapi.NetworkTopology, includeWireless bool) (topologyTree, error) {
