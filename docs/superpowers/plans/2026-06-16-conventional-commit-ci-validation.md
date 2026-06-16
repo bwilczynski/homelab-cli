@@ -95,7 +95,7 @@ jobs:
       - name: Validate PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: echo "$PR_TITLE" | npx commitlint
+        run: printf '%s\n' "$PR_TITLE" | npx commitlint
 
       - name: Validate PR commits
         run: npx commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }}

@@ -63,7 +63,7 @@ jobs:
       - name: Validate PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: echo "$PR_TITLE" | npx commitlint
+        run: printf '%s\n' "$PR_TITLE" | npx commitlint
 
       - name: Validate PR commits
         run: npx commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }}
@@ -73,7 +73,7 @@ jobs:
 
 - **Single tool, single config.** Using `@commitlint/cli` for both checks means there is one place to extend, override, or audit the rules. Conventional Commits is what semantic-release's default analyzer expects, so the rulesets stay aligned without coordination.
 - **Trigger types include `edited`.** A PR title is mutable; the check must re-run when the title changes, not only on commit push.
-- **PR title via `env`, not template interpolation.** Substituting `${{ github.event.pull_request.title }}` directly into a shell command allows command injection via crafted titles (backticks, `$(…)`). Passing through `env` and quoting `"$PR_TITLE"` blocks that.
+- **PR title via `env` + `printf '%s\n'`, not template interpolation or `echo`.** Substituting `${{ github.event.pull_request.title }}` directly into a shell command allows command injection via crafted titles (backticks, `$(…)`); passing through `env` and quoting `"$PR_TITLE"` blocks that. Bash's `echo` builtin also interprets leading `-e`, `-n`, `-E` as flags, so a title starting with `-e` would be expanded with backslash escapes before reaching commitlint — `printf '%s\n'` does not have that surface.
 - **`fetch-depth: 0`.** `commitlint --from --to` requires history reachable from both endpoints; the default shallow checkout omits it.
 - **Two steps, one job.** Sharing the `npm install` keeps the workflow fast and produces a single contiguous log for reviewers.
 - **`npm install --no-save`.** The repo has no `package.json` and adding one purely for CI tooling would invite drift; `--no-save` keeps the install ephemeral.
