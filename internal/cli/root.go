@@ -8,6 +8,7 @@ import (
 	"github.com/bwilczynski/hlctl/internal/cli/network"
 	"github.com/bwilczynski/hlctl/internal/cli/storage"
 	"github.com/bwilczynski/hlctl/internal/cli/system"
+	versioncli "github.com/bwilczynski/hlctl/internal/cli/version"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +32,7 @@ func NewRootCmd(f *cmdutil.Factory) *cobra.Command {
 		network.NewCmd(f),
 		storage.NewCmd(f),
 		system.NewCmd(f),
+		versioncli.NewCmd(f, nil),
 	)
 	return root
 }
