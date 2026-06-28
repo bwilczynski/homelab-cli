@@ -1,0 +1,8 @@
+package: meta
+generate:
+  client: true
+  models: true
+output: internal/api/meta/api.gen.go
+output-options:
+  include-tags:
+    - meta

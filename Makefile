@@ -12,11 +12,12 @@ build: ## Build the hlctl binary
 	go build -o $(BINARY) ./cmd/hlctl
 
 generate: bundle ## Generate client code from the bundled spec
-	@mkdir -p internal/api/system internal/api/docker internal/api/storage internal/api/network
+	@mkdir -p internal/api/system internal/api/docker internal/api/storage internal/api/network internal/api/meta
 	$(OAPI_CODEGEN) --config codegen/system.yaml $(SPEC_FILE)
 	$(OAPI_CODEGEN) --config codegen/docker.yaml $(SPEC_FILE)
 	$(OAPI_CODEGEN) --config codegen/storage.yaml $(SPEC_FILE)
 	$(OAPI_CODEGEN) --config codegen/network.yaml $(SPEC_FILE)
+	$(OAPI_CODEGEN) --config codegen/meta.yaml $(SPEC_FILE)
 
 bundle: ## Bundle the OpenAPI spec from the submodule
 	$(MAKE) -C $(SPEC_REPO) bundle
