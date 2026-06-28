@@ -37,6 +37,7 @@ Both are `security: []` (no auth required).
 | `Makefile` | Extract spec version from bundled YAML; pass as ldflag in `build` target |
 | `.goreleaser.yaml` | Add `specVersion` ldflag; add step to extract `SPEC_VERSION` env var before build |
 | `.github/workflows/release.yml` | Extract `SPEC_VERSION` env var before goreleaser runs |
+| `CLAUDE.md` | Replace stale `InjectClient`/`cmdutil.Client[T]`/`SetClient` references with the Options + runF pattern that is actually used |
 
 ## Data Flow
 
