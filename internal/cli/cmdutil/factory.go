@@ -13,7 +13,8 @@ import (
 // main, threaded through every NewCmd. Function-valued fields defer expensive
 // work (config load, token read, URL resolution) until a command actually runs.
 type Factory struct {
-	Version string
+	Version     string
+	SpecVersion string
 
 	IOStreams *IOStreams
 
@@ -27,7 +28,7 @@ type Factory struct {
 // caller passes *string pointers to flag-backed storage (declared on the root
 // command's PersistentFlags); the returned closures read the *latest* flag
 // values each invocation, so resolution sees flag-parsing outcomes correctly.
-func NewFactory(version string, apiURLFlag, outputFlag *string) *Factory {
+func NewFactory(version, specVersion string, apiURLFlag, outputFlag *string) *Factory {
 	var (
 		cfg     *config.Config
 		cfgErr  error
@@ -48,7 +49,8 @@ func NewFactory(version string, apiURLFlag, outputFlag *string) *Factory {
 		return c.ResolveAPIURL()
 	}
 	return &Factory{
-		Version:   version,
+		Version:     version,
+		SpecVersion: specVersion,
 		IOStreams: SystemIOStreams(),
 		Config:    loadConfig,
 		APIURL:    apiURLFn,

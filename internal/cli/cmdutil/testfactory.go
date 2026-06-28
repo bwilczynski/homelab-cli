@@ -23,7 +23,8 @@ import (
 func TestFactory(t *testing.T) *Factory {
 	t.Helper()
 	return &Factory{
-		Version:   "test",
+		Version:     "test",
+		SpecVersion: "test",
 		IOStreams: &IOStreams{In: strings.NewReader(""), Out: io.Discard, ErrOut: io.Discard},
 		Config: func() (*config.Config, error) {
 			return nil, errors.New("TestFactory: Config not configured")

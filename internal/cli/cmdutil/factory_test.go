@@ -10,7 +10,7 @@ import (
 func TestNewFactory_outputFlagDefersToLatestValue(t *testing.T) {
 	apiURL := ""
 	outputFmt := "table"
-	f := cmdutil.NewFactory("test", &apiURL, &outputFmt)
+	f := cmdutil.NewFactory("test", "0.0.0", &apiURL, &outputFmt)
 
 	if got := f.Output(); got != output.FormatTable {
 		t.Errorf("expected table, got %q", got)
@@ -25,7 +25,7 @@ func TestNewFactory_outputFlagDefersToLatestValue(t *testing.T) {
 func TestNewFactory_apiURLFlagOverridesConfig(t *testing.T) {
 	apiURL := "https://override.test"
 	outputFmt := "table"
-	f := cmdutil.NewFactory("test", &apiURL, &outputFmt)
+	f := cmdutil.NewFactory("test", "0.0.0", &apiURL, &outputFmt)
 
 	got, err := f.APIURL()
 	if err != nil {
