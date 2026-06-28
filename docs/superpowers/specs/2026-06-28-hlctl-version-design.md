@@ -124,16 +124,41 @@ warning: could not reach server: ...
 `codegen/meta.yaml` follows the same pattern as other domains (`system`, `docker`, etc.):
 `generate: client: true, models: true`, output to `internal/api/meta/api.gen.go`.
 
-The `version` command retrieves the client via `cmdutil.Client[MetaClient](cmd)` and calls
-`GetMetaVersion(ctx)`. `InjectClient` is called on the `version` command itself (no sibling
-commands share this client yet).
+## Command Implementation Pattern
+
+The `version` command follows the **Options + runF** pattern used by all existing commands
+(e.g. `health.go`, `info.go`):
+
+```go
+type versionOptions struct {
+    ClientVersion string
+    ClientSpec    string
+    HTTPClient    func() (*http.Client, string, error)
+    IO            *cmdutil.IOStreams
+    Output        func() output.Format
+}
+
+func newVersionCmd(f *cmdutil.Factory, runF func(*versionOptions) error) *cobra.Command {
+    opts := &versionOptions{
+        ClientVersion: f.Version,
+        ClientSpec:    f.SpecVersion,
+        HTTPClient:    f.HTTPClient,
+        IO:            f.IOStreams,
+        Output:        f.Output,
+    }
+    // ...
+}
+```
+
+In `RunE`, `opts.HTTPClient()` returns the `*http.Client` and base URL; the command
+constructs `NewMetaClient(httpClient, apiURL)` directly and calls `GetMetaVersion(ctx)`.
+There is no `cmdutil.InjectClient` / `cmdutil.Client[T]` mechanism — those do not exist.
 
 ## Testing
 
 Tests follow the existing pattern: construct the leaf command directly with
-`cmdutil.TestFactory(t)`, seed the client via `cmdutil.SetClient[MetaClient](cmd, stub)`,
-capture stdout, assert output lines.
+`cmdutil.TestFactory(t)` and override behaviour via the `runF` parameter.
 
 Two cases:
 1. Server reachable — all four fields present.
-2. `--client` flag — only two fields, no HTTP call made.
+2. `--client` flag — only two fields, `runF` asserts `HTTPClient` is never called.
