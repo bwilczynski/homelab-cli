@@ -2,7 +2,6 @@ package version
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
+
+var versionView = cmdutil.View{Templates: versionTemplates, Name: "version.tmpl"}
 
 type versionOptions struct {
 	ClientVersion string
@@ -26,15 +27,7 @@ type versionOutput struct {
 	ClientSpec    string  `json:"clientSpec"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
 	ServerSpec    *string `json:"serverSpec,omitempty"`
-}
-
-type versionView struct {
-	ClientVersion string
-	ClientSpec    string
-	ServerVersion string
-	ServerSpec    string
-	ServerAvail   bool
-	ClientOnly    bool
+	ClientOnly    bool    `json:"-"`
 }
 
 // NewCmd returns the `hlctl version` command.
@@ -61,8 +54,11 @@ func NewCmd(f *cmdutil.Factory, runF func(*versionOptions) error) *cobra.Command
 }
 
 func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error {
-	var serverVersion, serverSpec string
-	var serverAvail bool
+	out := versionOutput{
+		ClientVersion: opts.ClientVersion,
+		ClientSpec:    opts.ClientSpec,
+		ClientOnly:    opts.ClientOnly,
+	}
 
 	if !opts.ClientOnly {
 		if httpClient, apiURL, err := opts.HTTPClient(); err != nil {
@@ -72,32 +68,10 @@ func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error
 		} else if resp, err := c.GetMetaVersionWithResponse(ctx); err != nil {
 			fmt.Fprintf(opts.IO.ErrOut, "warning: could not reach server: %v\n", err)
 		} else if resp.JSON200 != nil {
-			serverVersion = resp.JSON200.ServerVersion
-			serverSpec = resp.JSON200.ApiVersion
-			serverAvail = true
+			out.ServerVersion = &resp.JSON200.ServerVersion
+			out.ServerSpec = &resp.JSON200.ApiVersion
 		}
 	}
 
-	if opts.Output() == output.FormatJSON {
-		out := versionOutput{
-			ClientVersion: opts.ClientVersion,
-			ClientSpec:    opts.ClientSpec,
-		}
-		if serverAvail {
-			out.ServerVersion = &serverVersion
-			out.ServerSpec = &serverSpec
-		}
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(out)
-	}
-
-	return output.RenderTemplate(w, versionTemplates, "version.tmpl", versionView{
-		ClientVersion: opts.ClientVersion,
-		ClientSpec:    opts.ClientSpec,
-		ServerVersion: serverVersion,
-		ServerSpec:    serverSpec,
-		ServerAvail:   serverAvail,
-		ClientOnly:    opts.ClientOnly,
-	})
+	return versionView.RenderObject(w, opts.Output(), out)
 }

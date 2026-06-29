@@ -167,6 +167,28 @@ func TestView_RenderWith_customStatus(t *testing.T) {
 	}
 }
 
+func TestView_RenderObject_table(t *testing.T) {
+	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
+	var buf bytes.Buffer
+	if err := v.RenderObject(&buf, output.FormatTable, greet{Name: "world"}); err != nil {
+		t.Fatalf("RenderObject: %v", err)
+	}
+	if got := buf.String(); got != "hello world\n" {
+		t.Errorf("unexpected output: %q", got)
+	}
+}
+
+func TestView_RenderObject_json(t *testing.T) {
+	v := cmdutil.View{Templates: fakeTemplates(), Name: "greet.tmpl"}
+	var buf bytes.Buffer
+	if err := v.RenderObject(&buf, output.FormatJSON, greet{Name: "world"}); err != nil {
+		t.Fatalf("RenderObject: %v", err)
+	}
+	if !strings.Contains(buf.String(), `"Name": "world"`) {
+		t.Errorf("expected JSON-encoded object, got %q", buf.String())
+	}
+}
+
 type fakeUnion struct {
 	Kind string
 	Data string
