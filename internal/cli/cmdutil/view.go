@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -63,6 +64,19 @@ func (v View) RenderWith(w io.Writer, outputFmt output.Format, statusCode int, b
 	data, err := fn()
 	if err != nil {
 		return err
+	}
+	return output.RenderTemplate(w, v.Templates, v.Name, data)
+}
+
+// RenderObject renders a locally constructed value: JSON-encodes it when
+// outputFmt is FormatJSON, otherwise executes the bound template against it.
+// Use this when the data is aggregated in the command (not lifted from a
+// single HTTP response body), so there is no raw body to pass through.
+func (v View) RenderObject(w io.Writer, outputFmt output.Format, data any) error {
+	if outputFmt == output.FormatJSON {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(data)
 	}
 	return output.RenderTemplate(w, v.Templates, v.Name, data)
 }

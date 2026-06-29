@@ -2,16 +2,16 @@ package version
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"text/tabwriter"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/output"
 	"github.com/spf13/cobra"
 )
+
+var versionView = cmdutil.View{Templates: versionTemplates, Name: "version.tmpl"}
 
 type versionOptions struct {
 	ClientVersion string
@@ -27,6 +27,7 @@ type versionOutput struct {
 	ClientSpec    string  `json:"clientSpec"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
 	ServerSpec    *string `json:"serverSpec,omitempty"`
+	ClientOnly    bool    `json:"-"`
 }
 
 // NewCmd returns the `hlctl version` command.
@@ -53,7 +54,11 @@ func NewCmd(f *cmdutil.Factory, runF func(*versionOptions) error) *cobra.Command
 }
 
 func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error {
-	var serverVersion, serverSpec string
+	out := versionOutput{
+		ClientVersion: opts.ClientVersion,
+		ClientSpec:    opts.ClientSpec,
+		ClientOnly:    opts.ClientOnly,
+	}
 
 	if !opts.ClientOnly {
 		if httpClient, apiURL, err := opts.HTTPClient(); err != nil {
@@ -63,36 +68,10 @@ func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error
 		} else if resp, err := c.GetMetaVersionWithResponse(ctx); err != nil {
 			fmt.Fprintf(opts.IO.ErrOut, "warning: could not reach server: %v\n", err)
 		} else if resp.JSON200 != nil {
-			serverVersion = resp.JSON200.ServerVersion
-			serverSpec = resp.JSON200.ApiVersion
+			out.ServerVersion = &resp.JSON200.ServerVersion
+			out.ServerSpec = &resp.JSON200.ApiVersion
 		}
 	}
 
-	if opts.Output() == output.FormatJSON {
-		out := versionOutput{
-			ClientVersion: opts.ClientVersion,
-			ClientSpec:    opts.ClientSpec,
-		}
-		if serverVersion != "" {
-			out.ServerVersion = &serverVersion
-			out.ServerSpec = &serverSpec
-		}
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(out)
-	}
-
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "Client version:\t%s\n", opts.ClientVersion)
-	fmt.Fprintf(tw, "Client spec:\t%s\n", opts.ClientSpec)
-	if !opts.ClientOnly {
-		if serverVersion != "" {
-			fmt.Fprintf(tw, "Server version:\t%s\n", serverVersion)
-			fmt.Fprintf(tw, "Server spec:\t%s\n", serverSpec)
-		} else {
-			fmt.Fprintf(tw, "Server version:\t(unavailable)\n")
-			fmt.Fprintf(tw, "Server spec:\t(unavailable)\n")
-		}
-	}
-	return tw.Flush()
+	return versionView.RenderObject(w, opts.Output(), out)
 }
