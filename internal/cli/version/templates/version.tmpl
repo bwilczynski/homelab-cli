@@ -1,0 +1,6 @@
+Client version:	{{ .ClientVersion }}
+Client spec:	{{ .ClientSpec }}
+{{- if not .ClientOnly }}
+Server version:	{{ if .ServerAvail }}{{ .ServerVersion }}{{ else }}(unavailable){{ end }}
+Server spec:	{{ if .ServerAvail }}{{ .ServerSpec }}{{ else }}(unavailable){{ end }}
+{{- end }}

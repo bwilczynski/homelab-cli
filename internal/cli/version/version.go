@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"text/tabwriter"
 
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/output"
@@ -27,6 +26,15 @@ type versionOutput struct {
 	ClientSpec    string  `json:"clientSpec"`
 	ServerVersion *string `json:"serverVersion,omitempty"`
 	ServerSpec    *string `json:"serverSpec,omitempty"`
+}
+
+type versionView struct {
+	ClientVersion string
+	ClientSpec    string
+	ServerVersion string
+	ServerSpec    string
+	ServerAvail   bool
+	ClientOnly    bool
 }
 
 // NewCmd returns the `hlctl version` command.
@@ -54,6 +62,7 @@ func NewCmd(f *cmdutil.Factory, runF func(*versionOptions) error) *cobra.Command
 
 func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error {
 	var serverVersion, serverSpec string
+	var serverAvail bool
 
 	if !opts.ClientOnly {
 		if httpClient, apiURL, err := opts.HTTPClient(); err != nil {
@@ -65,6 +74,7 @@ func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error
 		} else if resp.JSON200 != nil {
 			serverVersion = resp.JSON200.ServerVersion
 			serverSpec = resp.JSON200.ApiVersion
+			serverAvail = true
 		}
 	}
 
@@ -73,7 +83,7 @@ func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error
 			ClientVersion: opts.ClientVersion,
 			ClientSpec:    opts.ClientSpec,
 		}
-		if serverVersion != "" {
+		if serverAvail {
 			out.ServerVersion = &serverVersion
 			out.ServerSpec = &serverSpec
 		}
@@ -82,17 +92,12 @@ func getVersionRun(ctx context.Context, w io.Writer, opts *versionOptions) error
 		return enc.Encode(out)
 	}
 
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "Client version:\t%s\n", opts.ClientVersion)
-	fmt.Fprintf(tw, "Client spec:\t%s\n", opts.ClientSpec)
-	if !opts.ClientOnly {
-		if serverVersion != "" {
-			fmt.Fprintf(tw, "Server version:\t%s\n", serverVersion)
-			fmt.Fprintf(tw, "Server spec:\t%s\n", serverSpec)
-		} else {
-			fmt.Fprintf(tw, "Server version:\t(unavailable)\n")
-			fmt.Fprintf(tw, "Server spec:\t(unavailable)\n")
-		}
-	}
-	return tw.Flush()
+	return output.RenderTemplate(w, versionTemplates, "version.tmpl", versionView{
+		ClientVersion: opts.ClientVersion,
+		ClientSpec:    opts.ClientSpec,
+		ServerVersion: serverVersion,
+		ServerSpec:    serverSpec,
+		ServerAvail:   serverAvail,
+		ClientOnly:    opts.ClientOnly,
+	})
 }
