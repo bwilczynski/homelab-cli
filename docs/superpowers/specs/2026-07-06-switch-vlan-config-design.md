@@ -66,7 +66,7 @@ All fields are pre-resolved strings — no logic in the template.
 
 **Formatting rules:**
 
-- `LinkUptime`: formatted as human-readable duration (e.g. `1d 2h`, `45m`, `30s`) using a new `formatUptime(seconds int) string` template helper
+- `LinkUptime`: pre-formatted string in `buildSwitchPortViews` by calling `output.FormatUptime()` directly — consistent with the rest of the pre-resolved string fields on `switchPortView`
 - `LagInfo`: `master #<id>` or `member #<id>`
 - `SfpPresent`: `yes` / `no` (omitted ports render `-`)
 - `NativeVlan`: `<Name> (<vlanId>)`, e.g. `Default (1)`
@@ -84,11 +84,12 @@ Single template with two sections separated by `{{ flush }}`:
 
 ## Template Helpers
 
-New helper added to `internal/cli/network/templates.go` (or the shared template func map):
+All required helpers already exist in `internal/output/output.go` and are registered in the global template func map:
 
-- `formatUptime(seconds int) string` — converts seconds to `Xd Yh Zm Ws` dropping leading zero components, e.g. `1d 2h`, `45m`, `30s`
+- `formatUptime(seconds int) string` — already used in `device_base.tmpl`, `wans_list.tmpl`, and client templates
+- `formatLinkSpeed`, `formatBytesPerSec`, `derefStr`, `derefFloat` — unchanged
 
-Existing helpers (`formatLinkSpeed`, `formatBytesPerSec`, `derefStr`, `derefFloat`) unchanged.
+No new helpers needed.
 
 ## Testing
 
