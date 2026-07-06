@@ -10,6 +10,7 @@ import (
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil/httpmock"
 	"github.com/bwilczynski/hlctl/internal/output"
+	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 )
 
 // Layer 1: runF hook / flag parsing
@@ -70,6 +71,130 @@ func TestNewGetDeviceCmd_allPortsFlag(t *testing.T) {
 	}
 	if !captured.AllPorts {
 		t.Error("expected AllPorts=true")
+	}
+}
+
+func TestBuildSwitchPortViews_newFields(t *testing.T) {
+	label := "Backhaul"
+	uptime := 90061 // 1d 1h 1m 1s
+	sfp := true
+	iotVlan := networkapi.NetworkVlanRef{Id: "unifi.iot", Uri: "/network/vlans/unifi.iot", Name: "IoT", VlanId: 20}
+	guestVlan := networkapi.NetworkVlanRef{Id: "unifi.guest", Uri: "/network/vlans/unifi.guest", Name: "Guest", VlanId: 30}
+	ports := []networkapi.SwitchPort{
+		{
+			Number: 1, State: networkapi.NetworkPortStateUp,
+			PoeMode: "off",
+			Label:   &label,
+			LinkUptime: &uptime,
+			SfpModulePresent: &sfp,
+			LagMembership: &networkapi.SwitchPortLagMembership{Id: 3, Role: networkapi.SwitchPortLagMembershipRoleMaster},
+			VlanConfig: &networkapi.SwitchPortVlanConfig{
+				Mode:       networkapi.SwitchPortVlanConfigModeTrunk,
+				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
+				TaggedVlans: &struct {
+					Items *[]networkapi.NetworkVlanRef                        `json:"items,omitempty"`
+					Scope networkapi.SwitchPortVlanConfigTaggedVlansScope `json:"scope"`
+				}{
+					Scope: networkapi.SwitchPortVlanConfigTaggedVlansScopeCustom,
+					Items: &[]networkapi.NetworkVlanRef{iotVlan, guestVlan},
+				},
+			},
+			Traffic: networkapi.NetworkTraffic{},
+		},
+		{
+			Number: 2, State: networkapi.NetworkPortStateUp,
+			PoeMode: "off",
+			VlanConfig: &networkapi.SwitchPortVlanConfig{
+				Mode:       networkapi.SwitchPortVlanConfigModeTrunk,
+				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
+				TaggedVlans: &struct {
+					Items *[]networkapi.NetworkVlanRef                        `json:"items,omitempty"`
+					Scope networkapi.SwitchPortVlanConfigTaggedVlansScope `json:"scope"`
+				}{
+					Scope: networkapi.SwitchPortVlanConfigTaggedVlansScopeAll,
+				},
+			},
+			Traffic: networkapi.NetworkTraffic{},
+		},
+		{
+			Number: 3, State: networkapi.NetworkPortStateUp,
+			PoeMode: "off",
+			VlanConfig: &networkapi.SwitchPortVlanConfig{
+				Mode:       networkapi.SwitchPortVlanConfigModeAccess,
+				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
+			},
+			Traffic: networkapi.NetworkTraffic{},
+		},
+		{
+			Number: 4, State: networkapi.NetworkPortStateUp,
+			PoeMode: "off",
+			Traffic: networkapi.NetworkTraffic{},
+		},
+	}
+
+	views, err := buildSwitchPortViews(ports, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(views) != 4 {
+		t.Fatalf("expected 4 views, got %d", len(views))
+	}
+
+	// Port 1: all new fields set
+	p1 := views[0]
+	if p1.Label != "Backhaul" {
+		t.Errorf("port 1 Label: got %q, want %q", p1.Label, "Backhaul")
+	}
+	if p1.LinkUptime != "1d 1h 1m 1s" {
+		t.Errorf("port 1 LinkUptime: got %q, want %q", p1.LinkUptime, "1d 1h 1m 1s")
+	}
+	if p1.SfpPresent != "yes" {
+		t.Errorf("port 1 SfpPresent: got %q, want %q", p1.SfpPresent, "yes")
+	}
+	if p1.LagInfo != "master #3" {
+		t.Errorf("port 1 LagInfo: got %q, want %q", p1.LagInfo, "master #3")
+	}
+	if p1.VlanMode != "trunk" {
+		t.Errorf("port 1 VlanMode: got %q, want %q", p1.VlanMode, "trunk")
+	}
+	if p1.NativeVlan != "Default (1)" {
+		t.Errorf("port 1 NativeVlan: got %q, want %q", p1.NativeVlan, "Default (1)")
+	}
+	if p1.TaggedVlans != "IoT (20), Guest (30)" {
+		t.Errorf("port 1 TaggedVlans: got %q, want %q", p1.TaggedVlans, "IoT (20), Guest (30)")
+	}
+
+	// Port 2: scope=all
+	p2 := views[1]
+	if p2.TaggedVlans != "all" {
+		t.Errorf("port 2 TaggedVlans (scope=all): got %q, want %q", p2.TaggedVlans, "all")
+	}
+
+	// Port 3: access mode → tagged vlans = "-"
+	p3 := views[2]
+	if p3.TaggedVlans != "-" {
+		t.Errorf("port 3 TaggedVlans (access): got %q, want %q", p3.TaggedVlans, "-")
+	}
+
+	// Port 4: no vlanConfig → all VLAN fields "-"
+	p4 := views[3]
+	if p4.VlanMode != "-" {
+		t.Errorf("port 4 VlanMode (nil): got %q, want %q", p4.VlanMode, "-")
+	}
+	if p4.NativeVlan != "-" {
+		t.Errorf("port 4 NativeVlan (nil): got %q, want %q", p4.NativeVlan, "-")
+	}
+	if p4.Label != "-" {
+		t.Errorf("port 4 Label (nil): got %q, want %q", p4.Label, "-")
+	}
+	if p4.LinkUptime != "-" {
+		t.Errorf("port 4 LinkUptime (nil): got %q, want %q", p4.LinkUptime, "-")
+	}
+	if p4.LagInfo != "-" {
+		t.Errorf("port 4 LagInfo (nil): got %q, want %q", p4.LagInfo, "-")
+	}
+	if p4.SfpPresent != "-" {
+		t.Errorf("port 4 SfpPresent (nil): got %q, want %q", p4.SfpPresent, "-")
 	}
 }
 
