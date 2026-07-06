@@ -496,7 +496,7 @@ func TestGetDeviceRun_switch_vlanConfig(t *testing.T) {
 	}
 
 	// Port 4 (down) should be hidden by default
-	if strings.Contains(got, "\n4\t") {
+	if strings.Contains(got, "down") {
 		t.Errorf("expected down port 4 hidden by default, got:\n%s", got)
 	}
 
