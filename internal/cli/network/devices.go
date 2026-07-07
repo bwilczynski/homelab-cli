@@ -2,8 +2,10 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
@@ -24,6 +26,13 @@ type switchDetailView struct {
 type switchPortView struct {
 	networkapi.SwitchPort
 	ConnectedToName string
+	Label           string
+	LinkUptime      string
+	LagInfo         string
+	SfpPresent      string
+	VlanMode        string
+	NativeVlan      string
+	TaggedVlans     string
 }
 
 // buildSwitchPortViews filters and decorates a switch's ports for display.
@@ -36,6 +45,7 @@ func buildSwitchPortViews(ports []networkapi.SwitchPort, allPorts bool) ([]switc
 		if !allPorts && p.State != networkapi.NetworkPortStateUp {
 			continue
 		}
+
 		connectedTo := "-"
 		if p.ConnectedTo != nil {
 			kind, err := p.ConnectedTo.Discriminator()
@@ -57,7 +67,64 @@ func buildSwitchPortViews(ports []networkapi.SwitchPort, allPorts bool) ([]switc
 				connectedTo = ref.Name
 			}
 		}
-		out = append(out, switchPortView{SwitchPort: p, ConnectedToName: connectedTo})
+
+		label := "-"
+		if p.Label != nil {
+			label = *p.Label
+		}
+
+		linkUptime := "-"
+		if p.LinkUptime != nil {
+			linkUptime = output.FormatUptime(*p.LinkUptime)
+		}
+
+		lagInfo := "-"
+		if p.LagMembership != nil {
+			lagInfo = fmt.Sprintf("%s #%d", p.LagMembership.Role, p.LagMembership.Id)
+		}
+
+		sfpPresent := "-"
+		if p.SfpModulePresent != nil {
+			if *p.SfpModulePresent {
+				sfpPresent = "yes"
+			} else {
+				sfpPresent = "no"
+			}
+		}
+
+		vlanMode := "-"
+		nativeVlan := "-"
+		taggedVlans := "-"
+		if p.VlanConfig != nil {
+			vlanMode = string(p.VlanConfig.Mode)
+			nativeVlan = fmt.Sprintf("%s (%d)", p.VlanConfig.NativeVlan.Name, p.VlanConfig.NativeVlan.VlanId)
+			if p.VlanConfig.Mode == networkapi.SwitchPortVlanConfigModeTrunk && p.VlanConfig.TaggedVlans != nil {
+				switch p.VlanConfig.TaggedVlans.Scope {
+				case networkapi.SwitchPortVlanConfigTaggedVlansScopeAll:
+					taggedVlans = "all"
+				case networkapi.SwitchPortVlanConfigTaggedVlansScopeCustom:
+					if p.VlanConfig.TaggedVlans.Items != nil && len(*p.VlanConfig.TaggedVlans.Items) > 0 {
+						parts := make([]string, 0, len(*p.VlanConfig.TaggedVlans.Items))
+						for _, v := range *p.VlanConfig.TaggedVlans.Items {
+							parts = append(parts, fmt.Sprintf("%s (%d)", v.Name, v.VlanId))
+						}
+						taggedVlans = strings.Join(parts, ", ")
+					}
+				}
+			}
+		}
+
+		out = append(out, switchPortView{
+			SwitchPort:      p,
+			ConnectedToName: connectedTo,
+			Label:           label,
+			LinkUptime:      linkUptime,
+			LagInfo:         lagInfo,
+			SfpPresent:      sfpPresent,
+			VlanMode:        vlanMode,
+			NativeVlan:      nativeVlan,
+			TaggedVlans:     taggedVlans,
+		})
 	}
 	return out, nil
 }
