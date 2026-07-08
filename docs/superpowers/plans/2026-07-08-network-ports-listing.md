@@ -37,20 +37,51 @@ Tasks 2 and 3 land in a single client PR; Task 1 lands in a spec PR that must be
 
 ---
 
-## Task 1: Spec — `/network/ports` path and schemas
+## Task 1: Spec — `/network/ports` path, schemas, extracted parameters, shared VLAN-mode enum
 
 **Repo:** `homelab-api-spec` (accessed via the `spec/` submodule).
 
 **Files:**
+- Create: `spec/openapi/components/schemas/network/SwitchPortVlanMode.yaml`
 - Create: `spec/openapi/components/schemas/network/NetworkPort.yaml`
 - Create: `spec/openapi/components/schemas/network/NetworkPortList.yaml`
+- Create: `spec/openapi/components/parameters/SwitchIdFilter.yaml`
+- Create: `spec/openapi/components/parameters/SwitchPortModeFilter.yaml`
+- Create: `spec/openapi/components/parameters/NetworkPortStateFilter.yaml`
+- Create: `spec/openapi/components/parameters/VlanIdFilter.yaml`
 - Create: `spec/openapi/paths/network-ports.yaml`
+- Modify: `spec/openapi/components/schemas/network/SwitchPortVlanConfig.yaml` (replace inline `mode` enum with `$ref: SwitchPortVlanMode.yaml`)
 - Modify: `spec/openapi/openapi.yaml` (insert one `paths:` entry)
 
 **Interfaces:**
-- Produces: `GET /network/ports` → `NetworkPortList = { items: [NetworkPort] }`. Each `NetworkPort` inherits every field of `SwitchPort` and adds a required `switch: NetworkDeviceRef`. Query params: `switchId` (string), `mode` (`trunk|access`), `state` (`up|down`), `vlanId` (integer).
+- Produces: `GET /network/ports` → `NetworkPortList = { items: [NetworkPort] }`. Each `NetworkPort` inherits every field of `SwitchPort` and adds a required `switch: NetworkDeviceRef`. Query params reference: `switchId` (string), `mode` (`$ref SwitchPortVlanMode`), `state` (`$ref NetworkPortState`, accepts `up|down|disabled`), `vlanId` (integer, minimum 1).
+- Downstream ripple: the extracted `SwitchPortVlanMode.yaml` renames the oapi-codegen Go type. Callers of the current `networkapi.SwitchPortVlanConfigMode*` constants (specifically `internal/cli/network/devices.go`) need updating in Task 3.
 
-- [ ] **Step 1: Create `NetworkPort.yaml` schema**
+- [ ] **Step 1: Extract `SwitchPortVlanMode.yaml` and refactor `SwitchPortVlanConfig.yaml`**
+
+Create `spec/openapi/components/schemas/network/SwitchPortVlanMode.yaml`:
+
+```yaml
+type: string
+enum: [access, trunk]
+description: |
+  VLAN mode of a switch port.
+  - `access` — port carries a single untagged VLAN (the native VLAN)
+    and blocks all tagged traffic. Typical for end-device ports.
+  - `trunk` — port carries an untagged native VLAN plus one or more
+    tagged VLANs. Typical for uplinks and downstream AP links.
+```
+
+Modify `spec/openapi/components/schemas/network/SwitchPortVlanConfig.yaml`: replace the inline `mode` property (lines with `type: string`, `enum: [access, trunk]`, and the description) with a single `$ref: "./SwitchPortVlanMode.yaml"`. The final `mode` property block becomes:
+
+```yaml
+  mode:
+    $ref: "./SwitchPortVlanMode.yaml"
+```
+
+Leave the rest of the file untouched. The `required: [mode, nativeVlan]` at the bottom stays as-is.
+
+- [ ] **Step 2: Create `NetworkPort.yaml` schema**
 
 Path: `spec/openapi/components/schemas/network/NetworkPort.yaml`
 
@@ -67,34 +98,95 @@ allOf:
       switch:
         allOf:
           - $ref: "./NetworkDeviceRef.yaml"
-        description: |
-          Reference to the switch this port belongs to. Always populated;
-          `switch.kind` is always `device`.
+        description: Reference to the switch this port belongs to.
     required:
       - switch
 ```
 
-- [ ] **Step 2: Create `NetworkPortList.yaml` schema**
+The `description` on the `switch` property is intentionally terse — the `NetworkDeviceRef` schema already pins `kind` to `device`; restating that here duplicates the type system.
+
+- [ ] **Step 3: Create `NetworkPortList.yaml` schema**
 
 Path: `spec/openapi/components/schemas/network/NetworkPortList.yaml`
 
 ```yaml
 type: object
-description: List of switch ports across all managed switches.
+description: List of switch ports.
 properties:
   items:
     type: array
-    description: |
-      All switch ports across all managed switches from all configured
-      controllers. Empty array, never null. Order is not guaranteed;
-      clients should sort as needed.
+    description: Switch ports matching the query. Empty array, never null.
     items:
       $ref: "./NetworkPort.yaml"
 required:
   - items
 ```
 
-- [ ] **Step 3: Create `network-ports.yaml` path**
+Matches the tone of `NetworkClientList.yaml`. Sort-order guidance lives on the operation, not the schema.
+
+- [ ] **Step 4: Extract the four filter parameters**
+
+Create `spec/openapi/components/parameters/SwitchIdFilter.yaml`:
+
+```yaml
+name: switchId
+in: query
+required: false
+description: |
+  Filter to ports belonging to a specific switch, matched against the
+  composite device identifier (`{controller}.{name}`).
+schema:
+  type: string
+example: "unifi.switch-living-room"
+```
+
+Create `spec/openapi/components/parameters/SwitchPortModeFilter.yaml`:
+
+```yaml
+name: mode
+in: query
+required: false
+description: |
+  Filter by VLAN mode. Ports without a `vlanConfig` never match.
+schema:
+  $ref: "../schemas/network/SwitchPortVlanMode.yaml"
+example: trunk
+```
+
+Create `spec/openapi/components/parameters/NetworkPortStateFilter.yaml`:
+
+```yaml
+name: state
+in: query
+required: false
+description: |
+  Filter by port state. Accepts every value of `NetworkPortState`
+  including `disabled` — administratively-disabled ports can be
+  audited by passing `state=disabled`.
+schema:
+  $ref: "../schemas/network/NetworkPortState.yaml"
+example: up
+```
+
+Create `spec/openapi/components/parameters/VlanIdFilter.yaml`:
+
+```yaml
+name: vlanId
+in: query
+required: false
+description: |
+  Filter to ports that carry the given VLAN ID. A port matches when
+  its `vlanConfig.nativeVlan.vlanId` equals this value, OR when the
+  value appears in `vlanConfig.taggedVlans.items[*].vlanId`, OR when
+  the port is a trunk with `vlanConfig.taggedVlans.scope == "all"`.
+  Ports without a `vlanConfig` never match.
+schema:
+  type: integer
+  minimum: 1
+example: 20
+```
+
+- [ ] **Step 5: Create `network-ports.yaml` path**
 
 Path: `spec/openapi/paths/network-ports.yaml`
 
@@ -112,54 +204,21 @@ get:
 
     A homelab typically has a small number of switches (each with tens of
     ports), so this endpoint returns all results without pagination.
+    Result order is not guaranteed; clients should sort as needed.
 
     Filters are AND-composed and applied server-side; any combination is
-    valid. Ports without a `vlanConfig` (administratively disabled ports)
-    never match the `mode` or `vlanId` filters.
+    valid. Ports without a `vlanConfig` (either administratively disabled
+    or when the controller does not report enough data to resolve the
+    native VLAN) never match the `mode` or `vlanId` filters.
   tags:
     - network
   security:
     - bearerAuth: [read:network]
   parameters:
-    - name: switchId
-      in: query
-      required: false
-      description: |
-        Filter to ports belonging to a specific switch, matched against
-        the composite device identifier (`{controller}.{name}`).
-      schema:
-        type: string
-      example: "unifi.switch-living-room"
-    - name: mode
-      in: query
-      required: false
-      description: |
-        Filter by VLAN mode. Ports without a `vlanConfig` never match.
-      schema:
-        type: string
-        enum: [access, trunk]
-      example: trunk
-    - name: state
-      in: query
-      required: false
-      description: Filter by link state.
-      schema:
-        type: string
-        enum: [up, down]
-      example: up
-    - name: vlanId
-      in: query
-      required: false
-      description: |
-        Filter to ports that carry the given VLAN ID. A port matches when
-        its `vlanConfig.nativeVlan.vlanId` equals this value, OR when the
-        value appears in `vlanConfig.taggedVlans.items[*].vlanId`, OR when
-        the port is a trunk with `vlanConfig.taggedVlans.scope == "all"`.
-        Ports without a `vlanConfig` never match.
-      schema:
-        type: integer
-        minimum: 1
-      example: 20
+    - $ref: "../components/parameters/SwitchIdFilter.yaml"
+    - $ref: "../components/parameters/SwitchPortModeFilter.yaml"
+    - $ref: "../components/parameters/NetworkPortStateFilter.yaml"
+    - $ref: "../components/parameters/VlanIdFilter.yaml"
   responses:
     "200":
       description: List of switch ports across all switches.
@@ -300,7 +359,7 @@ get:
       $ref: "../components/responses/InternalServerError.yaml"
 ```
 
-- [ ] **Step 4: Wire the new path into the root document**
+- [ ] **Step 6: Wire the new path into the root document**
 
 Modify `spec/openapi/openapi.yaml`. Under `paths:`, insert `/network/ports` immediately after the existing `/network/devices/{deviceId}` entry so ports live next to devices:
 
@@ -313,7 +372,7 @@ Modify `spec/openapi/openapi.yaml`. Under `paths:`, insert `/network/ports` imme
     $ref: "./paths/network-clients.yaml"
 ```
 
-- [ ] **Step 5: Run spec lint and verify clean**
+- [ ] **Step 7: Run spec lint and verify clean**
 
 Run inside the spec submodule:
 
@@ -325,24 +384,30 @@ Expected: Redocly lint of the source spec and Spectral lint of the bundled artif
 
 If lint reports an issue on the new files, fix it before proceeding. Common failure modes: missing `required:` on a schema, wrong `$ref` relative path, missing `description` on a parameter.
 
-- [ ] **Step 6: Commit inside the spec submodule**
+- [ ] **Step 8: Commit inside the spec submodule**
 
 ```bash
 cd spec
-git add openapi/components/schemas/network/NetworkPort.yaml \
+git add openapi/components/schemas/network/SwitchPortVlanMode.yaml \
+        openapi/components/schemas/network/SwitchPortVlanConfig.yaml \
+        openapi/components/schemas/network/NetworkPort.yaml \
         openapi/components/schemas/network/NetworkPortList.yaml \
+        openapi/components/parameters/SwitchIdFilter.yaml \
+        openapi/components/parameters/SwitchPortModeFilter.yaml \
+        openapi/components/parameters/NetworkPortStateFilter.yaml \
+        openapi/components/parameters/VlanIdFilter.yaml \
         openapi/paths/network-ports.yaml \
         openapi/openapi.yaml
 git commit -m "feat: add /network/ports listing endpoint"
 ```
 
-- [ ] **Step 7: Open a spec PR, merge, and wait for release**
+- [ ] **Step 9: Open a spec PR, merge, and wait for release**
 
 Open the PR against `main` in the `homelab-api-spec` repo. Once merged, semantic-release will cut a new minor version (e.g. `1.4.0`) and publish a Git tag. Note the resulting commit SHA on the spec's `main` — Task 2 will bump the submodule to that SHA.
 
 ---
 
-## Task 2: Client — submodule bump, regenerate, extend `NetworkClient` interface
+## Task 2: Client — submodule bump, regenerate, extend `NetworkClient` interface, rename VLAN-mode constants
 
 **Repo:** client repo (this repository).
 
@@ -350,10 +415,12 @@ Open the PR against `main` in the `homelab-api-spec` repo. Once merged, semantic
 - Modify: `spec` (submodule pointer only)
 - Modify: `internal/api/network/api.gen.go` (regenerated; verified but not hand-edited)
 - Modify: `internal/cli/network/client.go` (add one method to the `NetworkClient` interface)
+- Modify: `internal/cli/network/devices.go` (rename `networkapi.SwitchPortVlanConfigModeTrunk` → `networkapi.SwitchPortVlanModeTrunk` on one line)
+- Modify: `internal/cli/network/devices_test.go` (rename three call sites: `SwitchPortVlanConfigModeTrunk` × 2, `SwitchPortVlanConfigModeAccess` × 1)
 
 **Interfaces:**
 - Consumes: the spec release from Task 1 (specifically, the commit SHA on the spec's `main`).
-- Produces: `networkapi.ListNetworkPortsWithResponse(ctx, params, editors...)` callable on the generated client, and the same method exposed on the `network.NetworkClient` interface so consumers can be typed against it. Also produces the generated types `networkapi.ListNetworkPortsParams`, `networkapi.NetworkPort`, `networkapi.NetworkPortList`, and `networkapi.ListNetworkPortsResponse` (with `JSON200 *NetworkPortList`).
+- Produces: `networkapi.ListNetworkPortsWithResponse(ctx, params, editors...)` callable on the generated client, and the same method exposed on the `network.NetworkClient` interface so consumers can be typed against it. Also produces the generated types `networkapi.ListNetworkPortsParams`, `networkapi.NetworkPort`, `networkapi.NetworkPortList`, `networkapi.ListNetworkPortsResponse` (with `JSON200 *NetworkPortList`), and the new shared enum type `networkapi.SwitchPortVlanMode` with constants `SwitchPortVlanModeAccess` / `SwitchPortVlanModeTrunk` (which supersede the deleted `SwitchPortVlanConfigModeAccess` / `SwitchPortVlanConfigModeTrunk`).
 
 - [ ] **Step 1: Bump the submodule pointer**
 
@@ -375,12 +442,20 @@ Expected: no errors; `internal/api/network/api.gen.go` is rewritten (gitignored;
 - [ ] **Step 3: Verify the generated symbols exist**
 
 ```bash
-grep -E 'func \(c \*ClientWithResponses\) ListNetworkPortsWithResponse|type ListNetworkPortsParams struct|type NetworkPort struct|type NetworkPortList struct|type ListNetworkPortsResponse struct' internal/api/network/api.gen.go
+grep -E 'func \(c \*ClientWithResponses\) ListNetworkPortsWithResponse|type ListNetworkPortsParams struct|type NetworkPort struct|type NetworkPortList struct|type ListNetworkPortsResponse struct|type SwitchPortVlanMode string' internal/api/network/api.gen.go
 ```
 
-Expected: five matches, one per grep alternative. If any is missing, revisit Task 1 (the schema/path may not have wired correctly) or the codegen config in `codegen/network.yaml`.
+Expected: six matches, one per grep alternative. If any is missing, revisit Task 1 (the schema/path may not have wired correctly) or the codegen config in `codegen/network.yaml`.
 
-Also note the field names on `ListNetworkPortsParams` — oapi-codegen normalizes query param names to `SwitchId`, `Mode`, `State`, `VlanId` (Go export case). If the exact spelling differs, Task 3 code must match the generator's output.
+Also verify the old inline enum type is gone:
+
+```bash
+grep -c 'SwitchPortVlanConfigMode' internal/api/network/api.gen.go
+```
+
+Expected: 0. If non-zero, `SwitchPortVlanConfig.mode` still has an inline enum in the spec — Task 1 step 1's `$ref` swap did not land.
+
+Field names on `ListNetworkPortsParams`: oapi-codegen normalizes query param names to `SwitchId`, `Mode`, `State`, `VlanId` (Go export case). Verify the field types too — `Mode` should be `*SwitchPortVlanMode` and `State` should be `*NetworkPortState` (pointers because the params are optional; the underlying types are the shared enums). If the exact naming differs, Task 3 code must match the generator's output.
 
 - [ ] **Step 4: Extend the `NetworkClient` interface**
 
@@ -392,7 +467,28 @@ Modify `internal/cli/network/client.go`. Add one line to the interface, next to 
 	ListNetworkClientsWithResponse(ctx context.Context, params *networkapi.ListNetworkClientsParams, reqEditors ...networkapi.RequestEditorFn) (*networkapi.ListNetworkClientsResponse, error)
 ```
 
-- [ ] **Step 5: Verify `go vet` and existing tests still pass**
+- [ ] **Step 5: Rename VLAN-mode enum call sites broken by the codegen rename**
+
+The extracted `SwitchPortVlanMode` schema means the old `networkapi.SwitchPortVlanConfigMode*` constants no longer exist. Rename each occurrence in the client:
+
+In `internal/cli/network/devices.go`, replace on the one matching line:
+- `networkapi.SwitchPortVlanConfigModeTrunk` → `networkapi.SwitchPortVlanModeTrunk`
+
+In `internal/cli/network/devices_test.go`, replace on three lines:
+- `networkapi.SwitchPortVlanConfigModeTrunk` → `networkapi.SwitchPortVlanModeTrunk` (×2)
+- `networkapi.SwitchPortVlanConfigModeAccess` → `networkapi.SwitchPortVlanModeAccess` (×1)
+
+If oapi-codegen emitted a different name (grep the generated file for `type SwitchPortVlanMode` and the corresponding constants), use whatever it produced.
+
+Verify:
+
+```bash
+go build ./internal/cli/...
+```
+
+Expected: clean build. Any remaining `SwitchPortVlanConfigMode*` reference will error here.
+
+- [ ] **Step 6: Verify `go vet` and existing tests still pass**
 
 ```bash
 make lint && go test ./internal/cli/network/...
@@ -400,14 +496,14 @@ make lint && go test ./internal/cli/network/...
 
 Expected: both pass. The generated concrete client satisfies the extended interface automatically; no other callers of `NewNetworkClient` should regress.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add spec internal/cli/network/client.go
+git add spec internal/cli/network/client.go internal/cli/network/devices.go internal/cli/network/devices_test.go
 git commit -m "chore: update homelab-api-spec submodule"
 ```
 
-The commit message intentionally does not mention the new endpoint — the next task's commit describes the feature. This matches existing history (`d8cd47b chore: update homelab-api-spec submodule`).
+The commit message intentionally does not mention the new endpoint — the next task's commit describes the feature. This matches existing history (`d8cd47b chore: update homelab-api-spec submodule`). The devices.go / devices_test.go edits ride in this commit because they are mechanical consequences of the codegen rename, not feature work.
 
 ---
 
@@ -576,6 +672,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 
 	networkapi "github.com/bwilczynski/hlctl/internal/api/network"
 	"github.com/bwilczynski/hlctl/internal/cli/cmdutil"
@@ -616,7 +713,7 @@ func newListPortsCmd(f *cmdutil.Factory, runF func(*listPortsOptions) error) *co
 			if err := validateEnum("mode", opts.Mode, "trunk", "access"); err != nil {
 				return err
 			}
-			if err := validateEnum("state", opts.State, "up", "down"); err != nil {
+			if err := validateEnum("state", opts.State, "up", "down", "disabled"); err != nil {
 				return err
 			}
 			if runF != nil {
@@ -627,7 +724,7 @@ func newListPortsCmd(f *cmdutil.Factory, runF func(*listPortsOptions) error) *co
 	}
 	cmd.Flags().StringVar(&opts.Switch, "switch", "", "Filter by switch device ID")
 	cmd.Flags().StringVar(&opts.Mode, "mode", "", "Filter by VLAN mode (trunk|access)")
-	cmd.Flags().StringVar(&opts.State, "state", "", "Filter by link state (up|down)")
+	cmd.Flags().StringVar(&opts.State, "state", "", "Filter by port state (up|down|disabled)")
 	cmd.Flags().IntVar(&opts.VlanID, "vlan", 0, "Filter to ports carrying this VLAN ID")
 	cmd.Flags().BoolVar(&opts.Wide, "wide", false, "Show additional columns (link speed, PoE, LAG, SFP, traffic)")
 	cmd.Flags().BoolVar(&opts.AllPorts, "all-ports", false, "Show all ports (overrides default state=up filter)")
@@ -1071,7 +1168,7 @@ func decoratePort(in portInput) (portRow, error) {
 	if p.VlanConfig != nil {
 		vlanMode = string(p.VlanConfig.Mode)
 		nativeVlan = fmt.Sprintf("%s (%d)", p.VlanConfig.NativeVlan.Name, p.VlanConfig.NativeVlan.VlanId)
-		if p.VlanConfig.Mode == networkapi.SwitchPortVlanConfigModeTrunk && p.VlanConfig.TaggedVlans != nil {
+		if p.VlanConfig.Mode == networkapi.SwitchPortVlanModeTrunk && p.VlanConfig.TaggedVlans != nil {
 			switch p.VlanConfig.TaggedVlans.Scope {
 			case networkapi.SwitchPortVlanConfigTaggedVlansScopeAll:
 				taggedVlans = "all"
@@ -1081,7 +1178,7 @@ func decoratePort(in portInput) (portRow, error) {
 					for _, v := range *p.VlanConfig.TaggedVlans.Items {
 						parts = append(parts, fmt.Sprintf("%s (%d)", v.Name, v.VlanId))
 					}
-					taggedVlans = joinComma(parts)
+					taggedVlans = strings.Join(parts, ", ")
 				}
 			}
 		}
@@ -1105,17 +1202,6 @@ func decoratePort(in portInput) (portRow, error) {
 		TxPerSec:        output.FormatBytesPerSec(p.Traffic.TxBytesPerSec),
 		ConnectedToName: connectedTo,
 	}, nil
-}
-
-func joinComma(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ", "
-		}
-		out += p
-	}
-	return out
 }
 
 type portsListData struct {
@@ -1182,7 +1268,7 @@ func buildListPortsParams(opts *listPortsOptions) *networkapi.ListNetworkPortsPa
 		params.SwitchId = &s
 	}
 	if opts.Mode != "" {
-		m := networkapi.ListNetworkPortsParamsMode(opts.Mode)
+		m := networkapi.SwitchPortVlanMode(opts.Mode)
 		params.Mode = &m
 	}
 	// State resolution: --all-ports omits state; explicit --state honoured;
@@ -1192,7 +1278,7 @@ func buildListPortsParams(opts *listPortsOptions) *networkapi.ListNetworkPortsPa
 		state = "up"
 	}
 	if !opts.AllPorts && state != "" {
-		s := networkapi.ListNetworkPortsParamsState(state)
+		s := networkapi.NetworkPortState(state)
 		params.State = &s
 	}
 	if opts.VlanID > 0 {
@@ -1203,7 +1289,7 @@ func buildListPortsParams(opts *listPortsOptions) *networkapi.ListNetworkPortsPa
 }
 ```
 
-Notes on generated types: `networkapi.ListNetworkPortsParamsMode` and `networkapi.ListNetworkPortsParamsState` are the typical inline-enum types oapi-codegen emits for query-param enums. If the actual generator output differs (e.g. the enum type is reused across params, giving a different type name), adjust the type name in `buildListPortsParams` to match — the semantics stay the same. Similarly, the `portInput` adapter's struct-literal field list must match the actual `networkapi.SwitchPort` field set; drop or rename fields to match the generated code.
+Notes on generated types: because Task 1 references the shared enum schemas (`SwitchPortVlanMode`, `NetworkPortState`) instead of inlining, oapi-codegen reuses the top-level enum types for the query-param fields. Expect `params.Mode: *SwitchPortVlanMode` and `params.State: *NetworkPortState`. If oapi-codegen emits a wrapper type instead, adjust the cast (`networkapi.<GeneratedType>(opts.Mode)`) — the semantics stay the same. Similarly, the `portInput` adapter's struct-literal field list must match the actual `networkapi.SwitchPort` field set; drop or rename fields to match the generated code.
 
 - [ ] **Step 8: Create the template**
 
@@ -1285,7 +1371,7 @@ func buildSwitchPortViews(ports []networkapi.SwitchPort, allPorts bool) ([]switc
 }
 ```
 
-Delete the `strings` import from `devices.go` (`joinComma` in `ports.go` now replaces `strings.Join`). If any other function in `devices.go` still uses `strings`, keep the import.
+Drop the `strings` import from `devices.go`: after this refactor, `buildSwitchPortViews` no longer calls `strings.Join` directly — that logic moved into `decoratePort` inside `ports.go`. Verify by grepping the file for `strings.` before removing the import; if any other function still uses it, keep the import.
 
 - [ ] **Step 12: Run all network tests to verify no regressions**
 

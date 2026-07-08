@@ -41,14 +41,16 @@ This document specifies both changes.
 - `tags: [network]`
 - `security: [bearerAuth: [read:network]]`
 
-**Query parameters** (all optional):
+**Query parameters** (all optional). Each is extracted to `openapi/components/parameters/` per repo convention (`DeviceFilter.yaml`, `UpdateStatusFilter.yaml`, etc.):
 
 | Name | Type | Notes |
 |---|---|---|
-| `switchId` | string | Composite device ID (e.g. `unifi.switch-living-room`). Filters to ports belonging to that switch. |
-| `mode` | enum `trunk\|access` | References `SwitchPortVlanConfigMode`. Ports with no `vlanConfig` never match. |
-| `state` | enum `up\|down` | References `NetworkPortState`. |
-| `vlanId` | integer | Matches when the value equals `vlanConfig.nativeVlan.vlanId`, OR appears in `vlanConfig.taggedVlans.items[*].vlanId`, OR when `vlanConfig.taggedVlans.scope == "all"` on a trunk port. Ports without a `vlanConfig` never match. |
+| `switchId` | string | Composite device ID (e.g. `unifi.switch-living-room`). Filters to ports belonging to that switch. Extracted to `parameters/SwitchIdFilter.yaml`. |
+| `mode` | `$ref: SwitchPortVlanMode` | References a new shared enum schema `SwitchPortVlanMode.yaml` extracted from the inline enum currently on `SwitchPortVlanConfig.mode`. Ports with no `vlanConfig` never match. Extracted to `parameters/SwitchPortModeFilter.yaml`. |
+| `state` | `$ref: NetworkPortState` | References the existing `NetworkPortState.yaml` enum — accepts `up`, `down`, and `disabled` (all three values from the schema). Extracted to `parameters/NetworkPortStateFilter.yaml`. |
+| `vlanId` | integer, minimum 1 | Matches when the value equals `vlanConfig.nativeVlan.vlanId`, OR appears in `vlanConfig.taggedVlans.items[*].vlanId`, OR when `vlanConfig.taggedVlans.scope == "all"` on a trunk port. Ports without a `vlanConfig` never match. Extracted to `parameters/VlanIdFilter.yaml`. |
+
+**Enum sourcing rationale:** referencing `NetworkPortState` directly (rather than inlining `[up, down]`) keeps a single source of truth and lets operators filter for administratively-disabled ports too. Extracting `SwitchPortVlanMode.yaml` and referencing it from both `SwitchPortVlanConfig.mode` and this filter eliminates the second enum-drift risk before a third caller appears.
 
 **Response**
 
@@ -57,17 +59,23 @@ This document specifies both changes.
 
 **Example payload** should mirror the switch example in `network-devices-id.yaml` so the CLI can reuse fixtures.
 
+**Description tone:** the endpoint description acknowledges both reasons `vlanConfig` can be omitted (administratively disabled *and* insufficient controller data), matching the schema. The description explicitly notes that filters `mode` and `vlanId` never match ports without a `vlanConfig`.
+
+### Schema — `openapi/components/schemas/network/SwitchPortVlanMode.yaml` (new, extracted)
+
+Standalone enum extracted from the inline enum currently on `SwitchPortVlanConfig.mode`. Contains the two-value enum `[access, trunk]` with the same description text. `SwitchPortVlanConfig.yaml` is updated to reference it (`allOf: [$ref: "./SwitchPortVlanMode.yaml"]` on the `mode` property).
+
 ### Schema — `openapi/components/schemas/network/NetworkPort.yaml`
 
 `allOf` inherits every field from `SwitchPort.yaml` (no duplication) and adds:
 
-- `switch` — `$ref` to the existing `NetworkDeviceRef.yaml` (`{kind: device, id, uri, name}`), the same ref shape already used by `NetworkConnectionRef` for `connectedTo`.
+- `switch` — `$ref` to the existing `NetworkDeviceRef.yaml`, using the same ref shape already used by `NetworkConnectionRef` for `connectedTo`. The property carries a brief description; the fact that `kind` is always `device` is guaranteed by the ref schema itself and is NOT restated here.
 
 `required: [number, state, poeMode, traffic, switch]` — parent required set plus `switch`.
 
 ### Schema — `openapi/components/schemas/network/NetworkPortList.yaml`
 
-`{ items: [NetworkPort] }`, `required: [items]`. Matches `NetworkDeviceList` shape.
+`{ items: [NetworkPort] }`, `required: [items]`. Matches `NetworkClientList` tone: `items` description reads "Switch ports matching the query. Empty array, never null." — no repeated operation-level guidance, no sort note (that lives on the operation).
 
 ### Wiring
 
@@ -132,7 +140,13 @@ Follows the Options + `runF` pattern documented in `CLAUDE.md`:
 ### Flag conflict rules
 
 - `--all-ports` and `--state` are mutually exclusive (`cmd.MarkFlagsMutuallyExclusive("all-ports", "state")`).
-- `--mode` and `--state` use `cobra.OnlyValidArgs`-style choice validation via `cmd.RegisterFlagCompletionFunc` and manual validation in `RunE` (or a small helper that matches the existing `output.Format` flag pattern).
+- `--mode` accepts `trunk|access`.
+- `--state` accepts `up|down|disabled` — mirrors the API filter which is now `$ref: NetworkPortState`.
+- Choice validation is done in `RunE` via a small `validateEnum(name, value, allowed...)` helper.
+
+### Generated Go type shift from the spec refactor
+
+Extracting `SwitchPortVlanMode.yaml` in the spec repo renames the generated Go enum type. Callers that currently reference `networkapi.SwitchPortVlanConfigModeTrunk` (in `internal/cli/network/devices.go`) must switch to `networkapi.SwitchPortVlanModeTrunk` (or whatever oapi-codegen actually emits from the shared schema). This is a compile-time rename to catch during Task 3.
 
 ### Decoration reuse
 
