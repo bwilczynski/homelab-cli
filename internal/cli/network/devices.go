@@ -98,7 +98,7 @@ func buildSwitchPortViews(ports []networkapi.SwitchPort, allPorts bool) ([]switc
 		if p.VlanConfig != nil {
 			vlanMode = string(p.VlanConfig.Mode)
 			nativeVlan = fmt.Sprintf("%s (%d)", p.VlanConfig.NativeVlan.Name, p.VlanConfig.NativeVlan.VlanId)
-			if p.VlanConfig.Mode == networkapi.SwitchPortVlanConfigModeTrunk && p.VlanConfig.TaggedVlans != nil {
+			if p.VlanConfig.Mode == networkapi.SwitchPortVlanModeTrunk && p.VlanConfig.TaggedVlans != nil {
 				switch p.VlanConfig.TaggedVlans.Scope {
 				case networkapi.SwitchPortVlanConfigTaggedVlansScopeAll:
 					taggedVlans = "all"

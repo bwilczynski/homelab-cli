@@ -11,6 +11,7 @@ import (
 type NetworkClient interface {
 	ListNetworkDevicesWithResponse(ctx context.Context, reqEditors ...networkapi.RequestEditorFn) (*networkapi.ListNetworkDevicesResponse, error)
 	GetNetworkDeviceWithResponse(ctx context.Context, deviceId string, reqEditors ...networkapi.RequestEditorFn) (*networkapi.GetNetworkDeviceResponse, error)
+	ListNetworkPortsWithResponse(ctx context.Context, params *networkapi.ListNetworkPortsParams, reqEditors ...networkapi.RequestEditorFn) (*networkapi.ListNetworkPortsResponse, error)
 	ListNetworkClientsWithResponse(ctx context.Context, params *networkapi.ListNetworkClientsParams, reqEditors ...networkapi.RequestEditorFn) (*networkapi.ListNetworkClientsResponse, error)
 	GetNetworkClientWithResponse(ctx context.Context, clientId string, reqEditors ...networkapi.RequestEditorFn) (*networkapi.GetNetworkClientResponse, error)
 	GetNetworkTopologyWithResponse(ctx context.Context, params *networkapi.GetNetworkTopologyParams, reqEditors ...networkapi.RequestEditorFn) (*networkapi.GetNetworkTopologyResponse, error)
