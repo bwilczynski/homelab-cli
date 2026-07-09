@@ -10,6 +10,6 @@ func NewCmd(f *cmdutil.Factory) *cobra.Command {
 		Use:   "network",
 		Short: "Network devices and clients",
 	}
-	cmd.AddCommand(newDevicesCmd(f), newClientsCmd(f), newTopologyCmd(f, nil), newVlansCmd(f), newSsidsCmd(f), newWansCmd(f))
+	cmd.AddCommand(newDevicesCmd(f), newClientsCmd(f), newTopologyCmd(f, nil), newVlansCmd(f), newSsidsCmd(f), newWansCmd(f), newPortsCmd(f))
 	return cmd
 }

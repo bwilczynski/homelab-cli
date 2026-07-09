@@ -89,7 +89,7 @@ func TestBuildSwitchPortViews_newFields(t *testing.T) {
 			SfpModulePresent: &sfp,
 			LagMembership: &networkapi.SwitchPortLagMembership{Id: 3, Role: networkapi.SwitchPortLagMembershipRoleMaster},
 			VlanConfig: &networkapi.SwitchPortVlanConfig{
-				Mode:       networkapi.SwitchPortVlanConfigModeTrunk,
+				Mode:       networkapi.SwitchPortVlanModeTrunk,
 				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
 				TaggedVlans: &struct {
 					Items *[]networkapi.NetworkVlanRef                        `json:"items,omitempty"`
@@ -105,7 +105,7 @@ func TestBuildSwitchPortViews_newFields(t *testing.T) {
 			Number: 2, State: networkapi.NetworkPortStateUp,
 			PoeMode: "off",
 			VlanConfig: &networkapi.SwitchPortVlanConfig{
-				Mode:       networkapi.SwitchPortVlanConfigModeTrunk,
+				Mode:       networkapi.SwitchPortVlanModeTrunk,
 				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
 				TaggedVlans: &struct {
 					Items *[]networkapi.NetworkVlanRef                        `json:"items,omitempty"`
@@ -120,7 +120,7 @@ func TestBuildSwitchPortViews_newFields(t *testing.T) {
 			Number: 3, State: networkapi.NetworkPortStateUp,
 			PoeMode: "off",
 			VlanConfig: &networkapi.SwitchPortVlanConfig{
-				Mode:       networkapi.SwitchPortVlanConfigModeAccess,
+				Mode:       networkapi.SwitchPortVlanModeAccess,
 				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
 			},
 			Traffic: networkapi.NetworkTraffic{},
