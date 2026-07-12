@@ -36,5 +36,8 @@ brews:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/bwilczynski/homelab-cli"
     description: "CLI for managing homelab infrastructure"
+    install: |
+      bin.install "hlctl"
+      generate_completions_from_executable(bin/"hlctl", "completion")
     test: |
       system "#{bin}/hlctl", "--version"
