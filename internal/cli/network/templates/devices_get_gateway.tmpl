@@ -1,1 +1,19 @@
 {{ template "deviceBase" . }}
+{{ flush }}
+--- PORTS ---
+PORT	LABEL	STATE	SPEED	UPTIME	SFP	LAG	POE	POE WATTS	RX	TX	CONNECTED TO
+{{ range .Ports -}}
+{{ .Number }}	{{ .Label }}	{{ .State }}	{{ if and (eq (string .State) "up") .LinkSpeed }}{{ formatLinkSpeed (derefStr .LinkSpeed) }}{{ else }}-{{ end }}	{{ .LinkUptime }}	{{ .SfpPresent }}	{{ .LagInfo }}	{{ .PoeMode }}	{{ if .PoePowerWatts }}{{ printf "%.1f W" (derefFloat .PoePowerWatts) }}{{ else }}-{{ end }}	{{ formatBytesPerSec .Traffic.RxBytesPerSec }}	{{ formatBytesPerSec .Traffic.TxBytesPerSec }}	{{ .ConnectedToName }}
+{{ end -}}
+{{ flush }}
+--- VLAN CONFIG ---
+PORT	MODE	NATIVE VLAN	TAGGED VLANS
+{{ range .Ports -}}
+{{ .Number }}	{{ .VlanMode }}	{{ .NativeVlan }}	{{ .TaggedVlans }}
+{{ end -}}
+{{ flush }}
+--- WANS ---
+ID	NAME
+{{ range .Wans -}}
+{{ .Id }}	{{ .Name }}
+{{ end -}}

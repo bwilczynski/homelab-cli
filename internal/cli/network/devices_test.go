@@ -562,6 +562,71 @@ func TestGetDeviceRun_switch_vlanConfig_allPorts(t *testing.T) {
 	reg.Verify(t)
 }
 
+func TestGetDeviceRun_gateway_ports(t *testing.T) {
+	fixture := map[string]any{
+		"id": "unifi.usg", "uri": "/network/devices/unifi.usg",
+		"name": "USG", "mac": "aa:bb:cc:dd:00:01", "ip": "192.168.1.1",
+		"type": "gateway", "status": "connected",
+		"model": "USG-3P", "firmwareVersion": "4.4.57", "uptime": 86400,
+		"traffic": map[string]any{
+			"rxBytesTotal": int64(0), "txBytesTotal": int64(0),
+			"rxBytesPerSec": int64(0), "txBytesPerSec": int64(0),
+		},
+		"ports": []any{
+			map[string]any{
+				"number": 1, "state": "up", "linkSpeed": "gbe1",
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(0), "txBytesTotal": int64(0),
+					"rxBytesPerSec": int64(5000), "txBytesPerSec": int64(1000),
+				},
+				"connectedTo": map[string]any{
+					"kind": "device", "id": "unifi.switch-lr",
+					"uri": "/network/devices/unifi.switch-lr", "name": "Switch LR",
+				},
+			},
+			map[string]any{
+				"number": 2, "state": "down",
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(0), "txBytesTotal": int64(0),
+					"rxBytesPerSec": int64(0), "txBytesPerSec": int64(0),
+				},
+			},
+		},
+		"wans": []any{
+			map[string]any{
+				"id": "unifi.wan1", "uri": "/network/wans/unifi.wan1", "name": "WAN 1",
+			},
+		},
+	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/network/devices/*"), httpmock.JSONResponse(fixture))
+
+	var out bytes.Buffer
+	opts := &getDeviceOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "unifi.usg",
+	}
+	if err := getDeviceRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := out.String()
+	for _, want := range []string{
+		"PORTS", "Switch LR",
+		"WANS", "unifi.wan1", "WAN 1",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, got)
+		}
+	}
+	// down port hidden by default (--all-ports not set)
+	if strings.Contains(got, "down") {
+		t.Errorf("expected down port hidden by default, got:\n%s", got)
+	}
+	reg.Verify(t)
+}
+
 func TestGetDeviceRun_accessPoint(t *testing.T) {
 	fixture := map[string]any{
 		"id": "unifi.ap-living-room", "uri": "/network/devices/unifi.ap-living-room",

@@ -21,6 +21,11 @@ type switchDetailView struct {
 	Ports []switchPortView
 }
 
+type gatewayDetailView struct {
+	networkapi.GatewayDetail
+	Ports []switchPortView
+}
+
 type switchPortView struct {
 	networkapi.DevicePort
 	ConnectedToName string
@@ -168,7 +173,17 @@ func getDeviceRun(ctx context.Context, w io.Writer, opts *getDeviceOptions) erro
 			},
 			"gateway": {
 				Template: "devices_get_gateway.tmpl",
-				Resolve:  func(d networkapi.NetworkDeviceDetail) (any, error) { return d.AsGatewayDetail() },
+				Resolve: func(d networkapi.NetworkDeviceDetail) (any, error) {
+					gw, err := d.AsGatewayDetail()
+					if err != nil {
+						return nil, err
+					}
+					portViews, err := buildDevicePortViews(gw.Ports, opts.AllPorts)
+					if err != nil {
+						return nil, err
+					}
+					return gatewayDetailView{GatewayDetail: gw, Ports: portViews}, nil
+				},
 			},
 			"unknown": {
 				Template: "devices_get_unknown.tmpl",
