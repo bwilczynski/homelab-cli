@@ -21,7 +21,7 @@ type listPortsOptions struct {
 	IO         *cmdutil.IOStreams
 	Output     func() output.Format
 
-	Switch   string
+	Device   string
 	Mode     string
 	State    string
 	VlanID   int
@@ -56,7 +56,7 @@ func newListPortsCmd(f *cmdutil.Factory, runF func(*listPortsOptions) error) *co
 			return listPortsRun(cmd.Context(), opts.IO.Out, opts)
 		},
 	}
-	cmd.Flags().StringVar(&opts.Switch, "switch", "", "Filter by switch device ID")
+	cmd.Flags().StringVar(&opts.Device, "device", "", "Filter by device ID (switch or gateway)")
 	cmd.Flags().StringVar(&opts.Mode, "mode", "", "Filter by VLAN mode (trunk|access)")
 	cmd.Flags().StringVar(&opts.State, "state", "", "Filter by port state (up|down|disabled)")
 	cmd.Flags().IntVar(&opts.VlanID, "vlan", 0, "Filter to ports carrying this VLAN ID")
@@ -82,7 +82,7 @@ func validateEnum(name, value string, allowed ...string) error {
 // It intentionally holds only string/scalar fields so the template stays
 // free of Go type conversions.
 type portRow struct {
-	SwitchName      string
+	DeviceName      string
 	Number          int
 	Label           string
 	State           string
@@ -101,15 +101,15 @@ type portRow struct {
 }
 
 // portInput is the shared decoration input. Both NetworkPort (flat list
-// response) and SwitchPort (nested in device detail) can be adapted to
+// response) and DevicePort (nested in device detail) can be adapted to
 // this shape; the decoration logic is centralized in decoratePort.
 type portInput struct {
-	SwitchName string
-	SwitchPort networkapi.SwitchPort
+	DeviceName string
+	DevicePort networkapi.DevicePort
 }
 
 func decoratePort(in portInput) (portRow, error) {
-	p := in.SwitchPort
+	p := in.DevicePort
 
 	connectedTo := "-"
 	if p.ConnectedTo != nil {
@@ -162,6 +162,11 @@ func decoratePort(in portInput) (portRow, error) {
 		}
 	}
 
+	poeMode := "-"
+	if p.PoeMode != nil {
+		poeMode = string(*p.PoeMode)
+	}
+
 	poePowerWatts := "-"
 	if p.PoePowerWatts != nil {
 		poePowerWatts = fmt.Sprintf("%.1f W", *p.PoePowerWatts)
@@ -173,11 +178,11 @@ func decoratePort(in portInput) (portRow, error) {
 	if p.VlanConfig != nil {
 		vlanMode = string(p.VlanConfig.Mode)
 		nativeVlan = fmt.Sprintf("%s (%d)", p.VlanConfig.NativeVlan.Name, p.VlanConfig.NativeVlan.VlanId)
-		if p.VlanConfig.Mode == networkapi.SwitchPortVlanModeTrunk && p.VlanConfig.TaggedVlans != nil {
+		if p.VlanConfig.Mode == networkapi.DevicePortVlanModeTrunk && p.VlanConfig.TaggedVlans != nil {
 			switch p.VlanConfig.TaggedVlans.Scope {
-			case networkapi.SwitchPortVlanConfigTaggedVlansScopeAll:
+			case networkapi.DevicePortVlanConfigTaggedVlansScopeAll:
 				taggedVlans = "all"
-			case networkapi.SwitchPortVlanConfigTaggedVlansScopeCustom:
+			case networkapi.DevicePortVlanConfigTaggedVlansScopeCustom:
 				if p.VlanConfig.TaggedVlans.Items != nil && len(*p.VlanConfig.TaggedVlans.Items) > 0 {
 					parts := make([]string, 0, len(*p.VlanConfig.TaggedVlans.Items))
 					for _, v := range *p.VlanConfig.TaggedVlans.Items {
@@ -190,7 +195,7 @@ func decoratePort(in portInput) (portRow, error) {
 	}
 
 	return portRow{
-		SwitchName:      in.SwitchName,
+		DeviceName:      in.DeviceName,
 		Number:          p.Number,
 		Label:           label,
 		State:           string(p.State),
@@ -198,7 +203,7 @@ func decoratePort(in portInput) (portRow, error) {
 		VlanMode:        vlanMode,
 		NativeVlan:      nativeVlan,
 		TaggedVlans:     taggedVlans,
-		PoeMode:         string(p.PoeMode),
+		PoeMode:         poeMode,
 		PoePowerWatts:   poePowerWatts,
 		LagInfo:         lagInfo,
 		SfpPresent:      sfpPresent,
@@ -235,8 +240,8 @@ func listPortsRun(ctx context.Context, w io.Writer, opts *listPortsOptions) erro
 		rows := make([]portRow, 0, len(resp.JSON200.Items))
 		for _, p := range resp.JSON200.Items {
 			row, err := decoratePort(portInput{
-				SwitchName: p.Switch.Name,
-				SwitchPort: networkapi.SwitchPort{
+				DeviceName: p.Device.Name,
+				DevicePort: networkapi.DevicePort{
 					Number:           p.Number,
 					Label:            p.Label,
 					State:            p.State,
@@ -257,8 +262,8 @@ func listPortsRun(ctx context.Context, w io.Writer, opts *listPortsOptions) erro
 			rows = append(rows, row)
 		}
 		sort.SliceStable(rows, func(i, j int) bool {
-			if rows[i].SwitchName != rows[j].SwitchName {
-				return rows[i].SwitchName < rows[j].SwitchName
+			if rows[i].DeviceName != rows[j].DeviceName {
+				return rows[i].DeviceName < rows[j].DeviceName
 			}
 			return rows[i].Number < rows[j].Number
 		})
@@ -268,16 +273,14 @@ func listPortsRun(ctx context.Context, w io.Writer, opts *listPortsOptions) erro
 
 func buildListPortsParams(opts *listPortsOptions) *networkapi.ListNetworkPortsParams {
 	params := &networkapi.ListNetworkPortsParams{}
-	if opts.Switch != "" {
-		s := opts.Switch
-		params.SwitchId = &s
+	if opts.Device != "" {
+		s := opts.Device
+		params.DeviceId = &s
 	}
 	if opts.Mode != "" {
-		m := networkapi.SwitchPortVlanMode(opts.Mode)
+		m := networkapi.DevicePortVlanMode(opts.Mode)
 		params.Mode = &m
 	}
-	// State resolution: --all-ports omits state; explicit --state honoured;
-	// otherwise default to "up".
 	state := opts.State
 	if !opts.AllPorts && state == "" {
 		state = "up"
