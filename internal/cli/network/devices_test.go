@@ -74,65 +74,73 @@ func TestNewGetDeviceCmd_allPortsFlag(t *testing.T) {
 	}
 }
 
-func TestBuildSwitchPortViews_newFields(t *testing.T) {
+func TestBuildDevicePortViews_newFields(t *testing.T) {
 	label := "Backhaul"
 	uptime := 90061 // 1d 1h 1m 1s
 	sfp := true
+	poeOff := networkapi.DevicePortPoeMode("off")
 	iotVlan := networkapi.NetworkVlanRef{Id: "unifi.iot", Uri: "/network/vlans/unifi.iot", Name: "IoT", VlanId: 20}
 	guestVlan := networkapi.NetworkVlanRef{Id: "unifi.guest", Uri: "/network/vlans/unifi.guest", Name: "Guest", VlanId: 30}
-	ports := []networkapi.SwitchPort{
+	ports := []networkapi.DevicePort{
 		{
-			Number: 1, State: networkapi.NetworkPortStateUp,
-			PoeMode: "off",
+			Number:  1,
+			State:   networkapi.NetworkPortStateUp,
+			PoeMode: &poeOff,
 			Label:   &label,
 			LinkUptime: &uptime,
 			SfpModulePresent: &sfp,
-			LagMembership: &networkapi.SwitchPortLagMembership{Id: 3, Role: networkapi.SwitchPortLagMembershipRoleMaster},
-			VlanConfig: &networkapi.SwitchPortVlanConfig{
-				Mode:       networkapi.SwitchPortVlanModeTrunk,
+			LagMembership: &networkapi.DevicePortLagMembership{
+				Id:   3,
+				Role: networkapi.DevicePortLagMembershipRoleMaster,
+			},
+			VlanConfig: &networkapi.DevicePortVlanConfig{
+				Mode:       networkapi.DevicePortVlanModeTrunk,
 				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
 				TaggedVlans: &struct {
-					Items *[]networkapi.NetworkVlanRef                        `json:"items,omitempty"`
-					Scope networkapi.SwitchPortVlanConfigTaggedVlansScope `json:"scope"`
+					Items *[]networkapi.NetworkVlanRef                         `json:"items,omitempty"`
+					Scope networkapi.DevicePortVlanConfigTaggedVlansScope `json:"scope"`
 				}{
-					Scope: networkapi.SwitchPortVlanConfigTaggedVlansScopeCustom,
+					Scope: networkapi.DevicePortVlanConfigTaggedVlansScopeCustom,
 					Items: &[]networkapi.NetworkVlanRef{iotVlan, guestVlan},
 				},
 			},
 			Traffic: networkapi.NetworkTraffic{},
 		},
 		{
-			Number: 2, State: networkapi.NetworkPortStateUp,
-			PoeMode: "off",
-			VlanConfig: &networkapi.SwitchPortVlanConfig{
-				Mode:       networkapi.SwitchPortVlanModeTrunk,
+			Number:  2,
+			State:   networkapi.NetworkPortStateUp,
+			PoeMode: &poeOff,
+			VlanConfig: &networkapi.DevicePortVlanConfig{
+				Mode:       networkapi.DevicePortVlanModeTrunk,
 				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
 				TaggedVlans: &struct {
-					Items *[]networkapi.NetworkVlanRef                        `json:"items,omitempty"`
-					Scope networkapi.SwitchPortVlanConfigTaggedVlansScope `json:"scope"`
+					Items *[]networkapi.NetworkVlanRef                         `json:"items,omitempty"`
+					Scope networkapi.DevicePortVlanConfigTaggedVlansScope `json:"scope"`
 				}{
-					Scope: networkapi.SwitchPortVlanConfigTaggedVlansScopeAll,
+					Scope: networkapi.DevicePortVlanConfigTaggedVlansScopeAll,
 				},
 			},
 			Traffic: networkapi.NetworkTraffic{},
 		},
 		{
-			Number: 3, State: networkapi.NetworkPortStateUp,
-			PoeMode: "off",
-			VlanConfig: &networkapi.SwitchPortVlanConfig{
-				Mode:       networkapi.SwitchPortVlanModeAccess,
+			Number:  3,
+			State:   networkapi.NetworkPortStateUp,
+			PoeMode: &poeOff,
+			VlanConfig: &networkapi.DevicePortVlanConfig{
+				Mode:       networkapi.DevicePortVlanModeAccess,
 				NativeVlan: networkapi.NetworkVlanRef{Id: "unifi.default", Uri: "/network/vlans/unifi.default", Name: "Default", VlanId: 1},
 			},
 			Traffic: networkapi.NetworkTraffic{},
 		},
 		{
-			Number: 4, State: networkapi.NetworkPortStateUp,
-			PoeMode: "off",
+			Number:  4,
+			State:   networkapi.NetworkPortStateUp,
+			PoeMode: &poeOff,
 			Traffic: networkapi.NetworkTraffic{},
 		},
 	}
 
-	views, err := buildSwitchPortViews(ports, true)
+	views, err := buildDevicePortViews(ports, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -265,6 +273,8 @@ func TestGetDeviceRun_gateway(t *testing.T) {
 			"rxBytesTotal": int64(12884901888), "txBytesTotal": int64(4294967296),
 			"rxBytesPerSec": int64(125000), "txBytesPerSec": int64(50000),
 		},
+		"ports": []any{},
+		"wans":  []any{},
 	}
 	reg := httpmock.NewRegistry()
 	reg.Register(httpmock.REST("GET", "/network/devices/*"), httpmock.JSONResponse(fixture))
@@ -284,7 +294,7 @@ func TestGetDeviceRun_gateway(t *testing.T) {
 			t.Errorf("expected %q in output, got:\n%s", want, out.String())
 		}
 	}
-	for _, absent := range []string{"PORTS", "CLIENTS", "UPLINK"} {
+	for _, absent := range []string{"CLIENTS", "UPLINK"} {
 		if strings.Contains(out.String(), absent) {
 			t.Errorf("expected %q absent for gateway, got:\n%s", absent, out.String())
 		}
@@ -548,6 +558,71 @@ func TestGetDeviceRun_switch_vlanConfig_allPorts(t *testing.T) {
 	// Port 2 has no vlanConfig → "-" in VLAN columns
 	if !strings.Contains(got, "VLAN CONFIG") {
 		t.Errorf("expected VLAN CONFIG section, got:\n%s", got)
+	}
+	reg.Verify(t)
+}
+
+func TestGetDeviceRun_gateway_ports(t *testing.T) {
+	fixture := map[string]any{
+		"id": "unifi.usg", "uri": "/network/devices/unifi.usg",
+		"name": "USG", "mac": "aa:bb:cc:dd:00:01", "ip": "192.168.1.1",
+		"type": "gateway", "status": "connected",
+		"model": "USG-3P", "firmwareVersion": "4.4.57", "uptime": 86400,
+		"traffic": map[string]any{
+			"rxBytesTotal": int64(0), "txBytesTotal": int64(0),
+			"rxBytesPerSec": int64(0), "txBytesPerSec": int64(0),
+		},
+		"ports": []any{
+			map[string]any{
+				"number": 1, "state": "up", "linkSpeed": "gbe1",
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(0), "txBytesTotal": int64(0),
+					"rxBytesPerSec": int64(5000), "txBytesPerSec": int64(1000),
+				},
+				"connectedTo": map[string]any{
+					"kind": "device", "id": "unifi.switch-lr",
+					"uri": "/network/devices/unifi.switch-lr", "name": "Switch LR",
+				},
+			},
+			map[string]any{
+				"number": 2, "state": "down",
+				"traffic": map[string]any{
+					"rxBytesTotal": int64(0), "txBytesTotal": int64(0),
+					"rxBytesPerSec": int64(0), "txBytesPerSec": int64(0),
+				},
+			},
+		},
+		"wans": []any{
+			map[string]any{
+				"id": "unifi.wan1", "uri": "/network/wans/unifi.wan1", "name": "WAN 1",
+			},
+		},
+	}
+	reg := httpmock.NewRegistry()
+	reg.Register(httpmock.REST("GET", "/network/devices/*"), httpmock.JSONResponse(fixture))
+
+	var out bytes.Buffer
+	opts := &getDeviceOptions{
+		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
+		HTTPClient: testHTTPClient(reg),
+		Output:     func() output.Format { return output.FormatTable },
+		ID:         "unifi.usg",
+	}
+	if err := getDeviceRun(context.Background(), &out, opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := out.String()
+	for _, want := range []string{
+		"PORTS", "Switch LR",
+		"WANS", "unifi.wan1", "WAN 1",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, got)
+		}
+	}
+	// down port hidden by default (--all-ports not set)
+	if strings.Contains(got, "down") {
+		t.Errorf("expected down port hidden by default, got:\n%s", got)
 	}
 	reg.Verify(t)
 }

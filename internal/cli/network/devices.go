@@ -21,39 +21,46 @@ type switchDetailView struct {
 	Ports []switchPortView
 }
 
+type gatewayDetailView struct {
+	networkapi.GatewayDetail
+	Ports []switchPortView
+}
+
 type switchPortView struct {
-	networkapi.SwitchPort
+	networkapi.DevicePort
 	ConnectedToName string
 	Label           string
 	LinkUptime      string
 	LagInfo         string
 	SfpPresent      string
+	PoeMode         string
 	VlanMode        string
 	NativeVlan      string
 	TaggedVlans     string
 }
 
-// buildSwitchPortViews filters and decorates a switch's ports for display.
+// buildDevicePortViews filters and decorates a device's ports for display.
 // When allPorts is false, only ports with state "up" are returned. Delegates
 // per-port decoration to decoratePort so devices get and ports list share
 // the same rendering rules.
-func buildSwitchPortViews(ports []networkapi.SwitchPort, allPorts bool) ([]switchPortView, error) {
+func buildDevicePortViews(ports []networkapi.DevicePort, allPorts bool) ([]switchPortView, error) {
 	var out []switchPortView
 	for _, p := range ports {
 		if !allPorts && p.State != networkapi.NetworkPortStateUp {
 			continue
 		}
-		row, err := decoratePort(portInput{SwitchName: "", SwitchPort: p})
+		row, err := decoratePort(portInput{DeviceName: "", DevicePort: p})
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, switchPortView{
-			SwitchPort:      p,
+			DevicePort:      p,
 			ConnectedToName: row.ConnectedToName,
 			Label:           row.Label,
 			LinkUptime:      row.LinkUptime,
 			LagInfo:         row.LagInfo,
 			SfpPresent:      row.SfpPresent,
+			PoeMode:         row.PoeMode,
 			VlanMode:        row.VlanMode,
 			NativeVlan:      row.NativeVlan,
 			TaggedVlans:     row.TaggedVlans,
@@ -153,7 +160,7 @@ func getDeviceRun(ctx context.Context, w io.Writer, opts *getDeviceOptions) erro
 					if err != nil {
 						return nil, err
 					}
-					portViews, err := buildSwitchPortViews(sw.Ports, opts.AllPorts)
+					portViews, err := buildDevicePortViews(sw.Ports, opts.AllPorts)
 					if err != nil {
 						return nil, err
 					}
@@ -166,7 +173,17 @@ func getDeviceRun(ctx context.Context, w io.Writer, opts *getDeviceOptions) erro
 			},
 			"gateway": {
 				Template: "devices_get_gateway.tmpl",
-				Resolve:  func(d networkapi.NetworkDeviceDetail) (any, error) { return d.AsGatewayDetail() },
+				Resolve: func(d networkapi.NetworkDeviceDetail) (any, error) {
+					gw, err := d.AsGatewayDetail()
+					if err != nil {
+						return nil, err
+					}
+					portViews, err := buildDevicePortViews(gw.Ports, opts.AllPorts)
+					if err != nil {
+						return nil, err
+					}
+					return gatewayDetailView{GatewayDetail: gw, Ports: portViews}, nil
+				},
 			},
 			"unknown": {
 				Template: "devices_get_unknown.tmpl",

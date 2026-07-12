@@ -39,7 +39,7 @@ func TestNewListPortsCmd_flagsCaptured(t *testing.T) {
 		return nil
 	})
 	cmd.SetArgs([]string{
-		"--switch", "unifi.switch-living-room",
+		"--device", "unifi.switch-living-room",
 		"--mode", "trunk",
 		"--state", "up",
 		"--vlan", "20",
@@ -54,8 +54,8 @@ func TestNewListPortsCmd_flagsCaptured(t *testing.T) {
 	if captured == nil {
 		t.Fatal("expected runF to be called")
 	}
-	if captured.Switch != "unifi.switch-living-room" {
-		t.Errorf("Switch: got %q", captured.Switch)
+	if captured.Device != "unifi.switch-living-room" {
+		t.Errorf("Device: got %q", captured.Device)
 	}
 	if captured.Mode != "trunk" {
 		t.Errorf("Mode: got %q", captured.Mode)
@@ -145,7 +145,7 @@ var portsFixture = map[string]any{
 				"kind": "device", "id": "unifi.usg",
 				"uri": "/network/devices/unifi.usg", "name": "USG",
 			},
-			"switch": map[string]any{
+			"device": map[string]any{
 				"kind": "device", "id": "unifi.switch-living-room",
 				"uri": "/network/devices/unifi.switch-living-room",
 				"name": "Switch Living Room",
@@ -179,7 +179,7 @@ var portsFixture = map[string]any{
 				"kind": "device", "id": "unifi.ap-living-room",
 				"uri": "/network/devices/unifi.ap-living-room", "name": "AP Living Room",
 			},
-			"switch": map[string]any{
+			"device": map[string]any{
 				"kind": "device", "id": "unifi.switch-living-room",
 				"uri": "/network/devices/unifi.switch-living-room",
 				"name": "Switch Living Room",
@@ -204,7 +204,7 @@ var portsFixture = map[string]any{
 				"kind": "client", "id": "unifi.nas-1-68",
 				"uri": "/network/clients/unifi.nas-1-68", "name": "nas-1",
 			},
-			"switch": map[string]any{
+			"device": map[string]any{
 				"kind": "device", "id": "unifi.switch-attic",
 				"uri": "/network/devices/unifi.switch-attic",
 				"name": "Switch Attic",
@@ -228,7 +228,7 @@ func TestListPortsRun_tableDefault(t *testing.T) {
 	}
 	got := out.String()
 	for _, want := range []string{
-		"SWITCH", "PORT", "LABEL", "STATE", "MODE", "NATIVE VLAN", "TAGGED VLANS", "CONNECTED TO",
+		"DEVICE", "PORT", "LABEL", "STATE", "MODE", "NATIVE VLAN", "TAGGED VLANS", "CONNECTED TO",
 		"Switch Living Room", "Switch Attic",
 		"AP uplink", "trunk", "access",
 		"Default (1)", "Servers (100)",
@@ -343,7 +343,7 @@ func TestListPortsRun_allQueryParams(t *testing.T) {
 		IO:         &cmdutil.IOStreams{Out: &out, ErrOut: &out},
 		HTTPClient: testHTTPClient(reg),
 		Output:     func() output.Format { return output.FormatTable },
-		Switch:     "unifi.switch-living-room",
+		Device:     "unifi.switch-living-room",
 		Mode:       "trunk",
 		State:      "down",
 		VlanID:     20,
@@ -356,7 +356,7 @@ func TestListPortsRun_allQueryParams(t *testing.T) {
 	}
 	q := reqURL.Query()
 	cases := map[string]string{
-		"switchId": "unifi.switch-living-room",
+		"deviceId": "unifi.switch-living-room",
 		"mode":     "trunk",
 		"state":    "down",
 		"vlanId":   "20",
@@ -384,10 +384,10 @@ func TestListPortsRun_jsonPassthrough(t *testing.T) {
 	}
 	got := out.String()
 	// Raw body echoed, table headers absent.
-	if strings.Contains(got, "SWITCH") || strings.Contains(got, "NATIVE VLAN") {
+	if strings.Contains(got, "DEVICE") || strings.Contains(got, "NATIVE VLAN") {
 		t.Errorf("expected JSON passthrough (no table headers), got:\n%s", got)
 	}
-	if !strings.Contains(got, `"switch"`) || !strings.Contains(got, "unifi.switch-living-room") {
+	if !strings.Contains(got, `"device"`) || !strings.Contains(got, "unifi.switch-living-room") {
 		t.Errorf("expected raw JSON body, got:\n%s", got)
 	}
 	reg.Verify(t)
