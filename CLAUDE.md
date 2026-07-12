@@ -32,7 +32,7 @@ make build
 - `cmd/hlctl/` — entrypoint
 - `internal/cli/` — Cobra command tree, root command
 - `internal/cli/cmdutil/` — shared command-construction helpers (client injection, View renderer, ActionCmd factory, DeviceFlag, Factory, IOStreams, TestFactory)
-- `internal/cli/<domain>/` — per-domain command packages (containers, system, storage, backups, network, config, login)
+- `internal/cli/<domain>/` — per-domain command packages (docker, system, storage, network, config, auth, version, watch)
 - `internal/api/<domain>/` — generated oapi-codegen client code (gitignored)
 - `internal/config/` — config file read/write (`~/.config/homelab/`)
 - `internal/auth/` — OAuth2 token storage and authenticated HTTP transport
@@ -56,6 +56,7 @@ make build
 8. Tests use two layers. Layer 1: pass a non-nil `runF` that sets a boolean and assert it was called — this verifies the Cobra wiring. Layer 2: construct the `opts` struct directly with `testHTTPClient(reg)` for the HTTP client and `httpmock.NewRegistry()` for mock responses, then call the run function directly. No `SetClient` or `InjectClient` — the `runF` hook and direct `opts` construction are the only test seams.
 9. For polymorphic responses (discriminated unions like `NetworkDeviceDetail`, `SystemUpdateDetail`), declare a `cmdutil.PolymorphicView[<UnionType>]` instead of a `View`. Its `Variants` map is keyed by the discriminator string returned by `T.Discriminator()`; each `Variant` binds a template name to a `Resolve func(T) (any, error)` that calls the appropriate `As<Variant>()` accessor (and optionally transforms the result). Render with `view.Render(w, f.Output(), resp.StatusCode(), resp.Body, resp.JSON200)` — same call shape as `View.Render`. When a variant resolver depends on per-call state (e.g. a flag), construct the `PolymorphicView` inside `RunE` so the resolver can close over it.
 10. When template data must be derived from the response body (e.g. row structs with formatted bytes/uptime), use `view.RenderWith(w, f.Output(), resp.StatusCode(), resp.Body, fn)` instead of `view.Render`. `fn` is invoked only in table mode, so derivation work is skipped when `--output=json`.
+11. When the command aggregates data locally rather than lifting it from a single HTTP response body (e.g. `version` merges client-side build info with a live server fetch), use `view.RenderObject(w, f.Output(), data)` instead of `view.Render`. It JSON-encodes for `--output=json` and renders the template otherwise — no raw body passthrough needed.
 
 ## Adding a New oapi-codegen Domain
 

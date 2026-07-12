@@ -50,15 +50,26 @@ TRAFFIC TX  6.1 MB/s (5.2 TB total)
 UPLINK      UCG-Fiber
 
 --- PORTS ---
-PORT  STATE  SPEED    POE   POE WATTS  RX         TX         CONNECTED TO
-1     up     10 GbE   off   -          12.8 MB/s  3.4 MB/s   NAS
-2     up     2.5 GbE  off   -          0.4 MB/s   1.2 MB/s   Workstation
-3     up     2.5 GbE  auto  8.4 W      0.6 MB/s   2.1 MB/s   AP-Office
-4     up     2.5 GbE  auto  9.2 W      1.1 MB/s   4.8 MB/s   AP-Living-Room
-5     down   -        off   -          0 B/s      0 B/s      -
-6     up     2.5 GbE  auto  6.1 W      0.3 MB/s   0.9 MB/s   Switch-Flex
-7     down   -        off   -          0 B/s      0 B/s      -
-8     down   -        off   -          0 B/s      0 B/s      -
+PORT  LABEL  STATE  SPEED    UPTIME          SFP  LAG  POE  POE WATTS  RX         TX         CONNECTED TO
+1     -      up     10 GbE   42d 6h 18m 0s   -    -    -    -          12.8 MB/s  3.4 MB/s   NAS
+2     -      up     2.5 GbE  42d 6h 17m 0s   -    -    -    -          0.4 MB/s   1.2 MB/s   Workstation
+3     -      up     2.5 GbE  42d 6h 16m 0s   -    -    on   8.4 W      0.6 MB/s   2.1 MB/s   AP-Office
+4     -      up     2.5 GbE  42d 6h 15m 0s   -    -    on   9.2 W      1.1 MB/s   4.8 MB/s   AP-Living-Room
+5     -      down   -        -               -    -    -    -          0 B/s      0 B/s      -
+6     -      up     2.5 GbE  42d 6h 14m 0s   -    -    on   6.1 W      0.3 MB/s   0.9 MB/s   Switch-Flex
+7     -      down   -        -               -    -    -    -          0 B/s      0 B/s      -
+8     -      down   -        -               -    -    -    -          0 B/s      0 B/s      -
+
+--- VLAN CONFIG ---
+PORT  MODE    NATIVE VLAN    TAGGED VLANS
+1     trunk   LAN-MGMT (1)   all
+2     trunk   LAN-MGMT (1)   all
+3     access  LAN-INT (10)   -
+4     access  LAN-INT (10)   -
+5     access  LAN-INT (10)   -
+6     trunk   LAN-MGMT (1)   all
+7     access  LAN-INT (10)   -
+8     access  LAN-INT (10)   -
 ```
 
 Useful when an AP is suddenly drawing 14W instead of the usual 8, or you want to know why that camera in the garage negotiated 100 Mbps on a cable that should do gigabit.
@@ -106,8 +117,9 @@ One click on the release URL tells you whether it's a security patch worth a mai
 | `docker` | Containers (lifecycle + inspect), networks, images, across every host |
 | `system` | Health, info, utilization, OS updates |
 | `storage` | Volumes and backups |
-| `network` | UniFi devices, clients, full topology |
-| `config` / `login` | Local CLI configuration and OAuth2 auth |
+| `network` | UniFi devices, clients, ports, VLANs, WAN links, SSIDs, full topology |
+| `config` / `auth` | Local CLI configuration and OAuth2 auth (login/logout) |
+| `version` | Client and server version info |
 
 Every command takes `--output json` and `--help`. Start from `hlctl --help`.
 
