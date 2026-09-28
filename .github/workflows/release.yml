@@ -13,10 +13,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
+      - uses: jdx/mise-action@v4
 
       - name: Generate API client code
         run: make generate
@@ -61,10 +58,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
+      - uses: jdx/mise-action@v4
 
       - name: Generate API client code
         run: make generate
@@ -72,10 +66,8 @@ jobs:
       - name: Extract spec version
         run: echo "SPEC_VERSION=$(grep '^  version:' spec/dist/openapi.bundled.yaml | awk '{print $2}')" >> $GITHUB_ENV
 
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: latest
-          args: release --clean
+      - name: GoReleaser
+        run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

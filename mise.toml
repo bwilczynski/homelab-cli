@@ -1,0 +1,5 @@
+# Toolchain for local development and CI (jdx/mise-action). Go libraries and
+# Go-installable tools such as oapi-codegen are pinned in go.mod instead.
+[tools]
+go = "1.26.2"
+goreleaser = "2.18.2"

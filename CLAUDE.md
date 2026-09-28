@@ -7,8 +7,9 @@
 ## Build & Run
 
 ```sh
-# First time: initialize the spec submodule
+# First time: initialize the spec submodule and install the pinned toolchain
 git submodule update --init
+mise install
 
 # Generate API client code from the OpenAPI spec
 make generate

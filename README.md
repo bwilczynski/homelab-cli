@@ -125,11 +125,12 @@ Every command takes `--output json` and `--help`. Start from `hlctl --help`.
 
 ## Setup
 
-Requires Go 1.22+ and GNU Make.
+Requires [mise](https://mise.jdx.dev) and GNU Make. mise installs the pinned Go and GoReleaser versions from `mise.toml`.
 
 ```sh
 git clone --recurse-submodules https://github.com/bwilczynski/hlctl.git
 cd hlctl
+mise install
 make generate
 make build
 ```
