@@ -1,7 +1,7 @@
 SPEC_REPO    := spec
 SPEC_FILE    := $(SPEC_REPO)/dist/openapi.bundled.yaml
 BINARY       := bin/hlctl
-OAPI_CODEGEN := go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+OAPI_CODEGEN := go tool oapi-codegen
 SPEC_VERSION := $(shell grep '^  version:' $(SPEC_FILE) | awk '{print $$2}')
 
 .PHONY: help build generate bundle lint test tidy
