@@ -162,7 +162,7 @@ func (s *diskSavingTokenSource) Token() (*oauth2.Token, error) {
 	tok, err := s.src.Token()
 	if err != nil {
 		if isExpiredRefreshToken(err) {
-			return nil, fmt.Errorf("session expired (run 'hlctl auth login')")
+			return nil, fmt.Errorf("session expired or replaced by a login elsewhere (run 'hlctl auth login')")
 		}
 		return nil, err
 	}
@@ -176,7 +176,21 @@ func (s *diskSavingTokenSource) Token() (*oauth2.Token, error) {
 	return tok, nil
 }
 
+// isExpiredRefreshToken reports whether the token endpoint rejected the stored
+// refresh token. Besides the standard invalid_grant, Dex answers invalid_request
+// (HTTP 400) when the token expired or was replaced by a newer login for the
+// same user and client, e.g. from another machine.
 func isExpiredRefreshToken(err error) bool {
 	var re *oauth2.RetrieveError
-	return errors.As(err, &re) && re.ErrorCode == "invalid_grant"
+	if !errors.As(err, &re) {
+		return false
+	}
+	switch re.ErrorCode {
+	case "invalid_grant":
+		return true
+	case "invalid_request":
+		return re.Response != nil && re.Response.StatusCode == http.StatusBadRequest
+	default:
+		return false
+	}
 }
